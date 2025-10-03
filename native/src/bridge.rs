@@ -4,7 +4,8 @@ use smithay::{
     wayland::{
         shell::xdg::ToplevelSurface,
         compositor::{
-            SurfaceAttributes, BufferAssignment, with_states
+            SurfaceAttributes, BufferAssignment, with_states,
+            with_surface_tree_upward, TraversalAction, SubsurfaceCachedState,
         },
         shm::with_buffer_contents,
     },
@@ -158,6 +159,10 @@ fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_toplevels<'l>(
 #[allow(non_upper_case_globals)]
 const WLCSurface_class: &str = "dev/evvie/waylandcraft/bridge/WLCSurface";
 
+#[allow(non_upper_case_globals)]
+const WaylandCraftBridge_class: &str =
+    "dev/evvie/waylandcraft/bridge/WaylandCraftBridge";
+
 fn jptr_to_wlsurface(ptr: jlong) -> &'static mut WlSurface {
     let ptr: *mut WlSurface = (ptr as usize) as *mut WlSurface;
     unsafe { &mut *ptr }
@@ -239,29 +244,137 @@ fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_toplevelSurface<'l>(
     insert_get_handle(&mut instance.bridge.surfaces, surface)
 }
 
+fn get_or_create_surface<'l>(
+    env: &mut JNIEnv<'l>,
+    state: &mut BridgeState,
+    bridge_obj: &JObject<'l>,
+    surface: &WlSurface
+) -> JObject<'l> {
+    let handle = insert_get_handle(&mut state.surfaces, surface);
+    let sig = "(J)Ldev/evvie/waylandcraft/bridge/WLCSurface;";
+    unsafe {
+        env.call_method_unchecked(
+            bridge_obj,
+            (WaylandCraftBridge_class, "getOrCreateSurface", sig),
+            ReturnType::Object,
+            &[
+                jvalue { j: handle },
+            ]
+        ).unwrap().l().unwrap()
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "system"
 fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_updateSurfaceTree<'l>(
     mut env: JNIEnv<'l>,
-    _bridge: JObject<'l>,
-    obj: JObject<'l>
+    bridge_obj: JObject<'l>,
+    root: JObject<'l>
 ) {
+    let instance_ptr: jlong = env.get_field_unchecked(
+        &bridge_obj,
+        (WaylandCraftBridge_class, "instance", "J"),
+        ReturnType::Primitive(Primitive::Long)
+    ).unwrap().j().unwrap();
+
+    let instance = jptr_to_instance(instance_ptr);
+
     let handle: jlong = env.get_field_unchecked(
-        &obj,
+        &root,
         (WLCSurface_class, "handle", "J"),
         ReturnType::Primitive(Primitive::Long)
     ).unwrap().j().unwrap();
 
-    let _surface = jptr_to_wlsurface(handle);
+    let surface = jptr_to_wlsurface(handle);
 
-    // TODO: Implement tree walking
+    let mut last_child: JObject = JObject::null();
 
-    // Just mark root surface as visited for now
-    env.set_field_unchecked(
-        &obj,
-        (WLCSurface_class, "visited", "Z"),
-        JValue::Bool(1)
-    ).unwrap();
+    with_surface_tree_upward(
+        surface,
+        None,
+        |surface, _data, _parent| {
+            TraversalAction::DoChildren(Some(surface.clone()))
+        },
+        |surface, data, parent| {
+            let obj = get_or_create_surface(
+                &mut env,
+                &mut instance.bridge,
+                &bridge_obj,
+                surface
+            );
+
+            // Set the WLCSurface parentHandle
+            let parent_handle = if let Some(p) = parent {
+                insert_get_handle(
+                    &mut instance.bridge.surfaces,
+                    &p
+                )
+            } else { 0 };
+            env.set_field_unchecked(
+                &obj,
+                (WLCSurface_class, "parentHandle", "J"),
+                JValue::Long(parent_handle),
+            ).unwrap();
+
+            // Set last child to point to this current surface
+            if !last_child.as_raw().is_null() {
+                env.set_field_unchecked(
+                    &last_child,
+                    (
+                        WLCSurface_class,
+                        "nextChild",
+                        "Ldev/evvie/waylandcraft/bridge/WLCSurface;"
+                    ),
+                    JValue::Object(&obj)
+                ).unwrap();
+            }
+
+            // Set this surfaces nextChild to null
+            env.set_field_unchecked(
+                &obj,
+                (
+                    WLCSurface_class,
+                    "nextChild",
+                    "Ldev/evvie/waylandcraft/bridge/WLCSurface;"
+                ),
+                JValue::Object(&JObject::null())
+            ).unwrap();
+
+            // Mark this surface as visited
+            env.set_field_unchecked(
+                &obj,
+                (WLCSurface_class, "visited", "Z"),
+                JValue::Bool(1)
+            ).unwrap();
+
+            // Set subsurface location
+            let (sx, sy) = if data.cached_state.has::<SubsurfaceCachedState>() {
+                let mut subattr_guard = data
+                    .cached_state
+                    .get::<SubsurfaceCachedState>();
+                let subattr = subattr_guard
+                    .deref_mut()
+                    .current();
+                (subattr.location.x, subattr.location.y)
+
+            } else { (0, 0) };
+
+            env.set_field_unchecked(
+                &obj,
+                (WLCSurface_class, "xoff", "I"),
+                JValue::Int(sx)
+            ).unwrap();
+
+            env.set_field_unchecked(
+                &obj,
+                (WLCSurface_class, "yoff", "I"),
+                JValue::Int(sy)
+            ).unwrap();
+
+            last_child = obj;
+        },
+        |_surface, _data, _parent| true
+    );
 }
 
 #[unsafe(no_mangle)]

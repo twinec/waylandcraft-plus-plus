@@ -96,12 +96,35 @@ public class WaylandCraftBridge {
 		// All surface trees have now been walked. Now delete all unvisited surfaces
 		deleteUnvisitedSurfaces();
 		
+		// Resolve surface parent handles to actual surfaces
+		for(WLCSurface surface : surfaces) {
+			if(surface.parentHandle != 0) {
+				surface.parent = getOrCreateSurface(surface.parentHandle);
+			}
+			else {
+				surface.parent = null;
+			}
+		}
+		
 		// Update all surface buffers
 		for(WLCToplevel toplevel : toplevels) {
 			WLCSurface root = toplevel.getSurfaceTree();
 			for(WLCSurface surface = root; surface != null; surface = surface.getNextChild()) {
 				updateSurfaceData(surface);
+				calculateSubpos(surface);
 			}
+		}
+	}
+	
+	private void calculateSubpos(WLCSurface surface) {
+		if(surface.parent != null) {
+			calculateSubpos(surface.parent);
+			surface.xSubpos = surface.parent.xSubpos + surface.xoff;
+			surface.ySubpos = surface.parent.ySubpos + surface.yoff;
+		}
+		else {
+			surface.xSubpos = 0;
+			surface.ySubpos = 0;
 		}
 	}
 	

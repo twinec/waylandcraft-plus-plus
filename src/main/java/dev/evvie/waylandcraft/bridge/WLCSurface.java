@@ -17,21 +17,20 @@ public class WLCSurface {
 	
 	// Either a child of this surface or one of its siblings
 	@Nullable
-	private WLCSurface nextChild = null;
+	protected WLCSurface nextChild = null;
+	
+	protected long parentHandle = 0;
 	
 	@Nullable
-	private WLCSurface parent = null;
+	protected WLCSurface parent = null;
 	
 	// X and Y offsets relative to parent coords
-	private int xoff = 0;
-	private int yoff = 0;
+	protected int xoff = 0;
+	protected int yoff = 0;
 	
 	// Total calculated offsets
 	public int xSubpos = 0;
 	public int ySubpos = 0;
-	
-	// Total depth
-	public int depth = 0;
 	
 	protected WLCSurface(long handle) {
 		this.handle = handle;
@@ -51,23 +50,11 @@ public class WLCSurface {
 		return handle != 0;
 	}
 	
-	protected void setNextChild(WLCSurface surface) {
-		this.nextChild = surface;
-	}
-	
 	protected void attachShmBuffer(long ptr, int width, int height) {
 		if(this.buffer != null) {
 			this.buffer.release();
 		}
 		this.buffer = new BufferTexture(ptr, width, height);
-	}
-	
-	protected void setXOff(int xoff) {
-		this.xoff = xoff;
-	}
-
-	protected void setYOff(int yoff) {
-		this.yoff = yoff;
 	}
 	
 	@Nullable
@@ -83,14 +70,6 @@ public class WLCSurface {
 	@Nullable
 	public WLCSurface getNextChild() {
 		return this.nextChild;
-	}
-	
-	public int getSubOffsetX() {
-		return this.xoff;
-	}
-
-	public int getSubOffsetY() {
-		return this.yoff;
 	}
 	
 }
