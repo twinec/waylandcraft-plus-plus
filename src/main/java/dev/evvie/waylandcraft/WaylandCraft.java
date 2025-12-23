@@ -17,6 +17,8 @@ import dev.evvie.waylandcraft.bridge.WLCToplevel;
 import dev.evvie.waylandcraft.bridge.WaylandCraftBridge;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
@@ -29,6 +31,7 @@ import net.minecraft.world.phys.Vec3;
 public class WaylandCraft implements ModInitializer, ClientModInitializer {
 	public static final String MOD_ID = "waylandcraft";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+	private static final String KEYBIND_CATEGORY = "key.categories." + MOD_ID;
 	
 	public static WaylandCraft instance;
 	
@@ -36,6 +39,8 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 	public ArrayList<Window> windows = new ArrayList<Window>();
 	public WindowHitResult hitResult = null;
 	public boolean keyboardCaptured = false;
+	
+	public KeyMapping keyOpenScreen;
 	
 	@Override
 	public void onInitialize() {
@@ -46,6 +51,8 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 		LOGGER.info("Initializing WaylandCraft");
 		
 		instance = this;
+		
+		keyOpenScreen = KeyBindingHelper.registerKeyBinding(new KeyMapping("key.windowManager", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_B, KEYBIND_CATEGORY));
 		
 		WorldRenderEvents.AFTER_ENTITIES.register(context -> {
 			if(bridge == null) {
@@ -75,6 +82,12 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 			windows.forEach((w) -> w.render(context));
 			
 			sendMotionEvents();
+		});
+		
+		ClientTickEvents.END_CLIENT_TICK.register((mc) -> {
+			if(keyOpenScreen.consumeClick()) {
+				mc.setScreen(new WindowManagerScreen(WaylandCraft.instance));
+			}
 		});
 		
 		HudRenderCallback.EVENT.register((context, delta) -> {
