@@ -50,6 +50,7 @@ use jni::{
 };
 
 pub(crate) struct BridgeState {
+    /* Handle collections */
     toplevels: Vec<Box<ToplevelSurface>>,
     popups: Vec<Box<PopupSurface>>,
     surfaces: Vec<Box<WlSurface>>,
@@ -232,6 +233,30 @@ fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_popups<'l>(
     let popups = get_all_handles(&mut instance.bridge.popups);
     let array = env.new_long_array(popups.len() as jsize).unwrap();
     env.set_long_array_region(&array, 0, &popups).unwrap();
+    array.into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "system"
+fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_minimized<'l>(
+    env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    ptr: jlong
+) -> jarray {
+    let instance = jptr_to_instance(ptr);
+
+    let handles: Vec<jlong> = instance
+        .state
+        .minimized_toplevels
+        .iter()
+        .filter(|t| t.alive())
+        .map(|t| insert_get_handle(&mut instance.bridge.toplevels, t))
+        .collect();
+
+    instance.state.minimized_toplevels.clear();
+
+    let array = env.new_long_array(handles.len() as jsize).unwrap();
+    env.set_long_array_region(&array, 0, &handles).unwrap();
     array.into_raw()
 }
 

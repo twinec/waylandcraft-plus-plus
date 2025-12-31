@@ -2,6 +2,7 @@ package dev.evvie.waylandcraft;
 
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.stream.Stream;
 
 import org.joml.Matrix4f;
 import org.lwjgl.glfw.GLFW;
@@ -96,6 +97,10 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 			}
 			
 			windows.removeIf((w) -> !w.isAlive());
+			
+			// Hide all windows that were minimized and unset minimized state
+			windows.removeIf((w) -> w.backing instanceof WLCToplevel && ((WLCToplevel) w.backing).minimized);
+			Stream.of(bridge.getToplevels()).forEach((t) -> t.minimized = false);
 			
 			if(grabbedWindow != null && !grabbedWindow.isAlive()) grabbedWindow = null;
 			if(grabbedWindow != null) anchorToCamera(grabbedWindow, context.camera());

@@ -89,6 +89,7 @@ pub struct WLCState {
     pub dmabuf_state: DmabufState,
     pub dmabuf_global: DmabufGlobal,
     pub seat: Seat<Self>,
+    pub minimized_toplevels: Vec<ToplevelSurface>,
 }
 
 impl WLCState {
@@ -124,6 +125,7 @@ impl WLCState {
             dmabuf_state,
             dmabuf_global,
             seat,
+            minimized_toplevels: vec![],
         }
     }
 }
@@ -235,6 +237,10 @@ impl XdgShellHandler for WLCState {
             state.positioner = positioner;
         });
         surface.send_repositioned(token);
+    }
+
+    fn minimize_request(&mut self, surface: ToplevelSurface) {
+        self.minimized_toplevels.push(surface);
     }
 }
 

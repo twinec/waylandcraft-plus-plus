@@ -165,12 +165,14 @@ public class WaylandCraftBridge {
 		update(this.instance);
 		
 		// Find all available toplevels and delete ones that no longer exist
-		long[] toplevel_handles = toplevels(instance);
-		deleteNonExistingToplevels(toplevel_handles);
+		long[] toplevelHandles = toplevels(instance);
+		deleteNonExistingToplevels(toplevelHandles);
 		
 		// Find all available popups and delete ones that no longer exist
-		long[] popup_handles = popups(instance);
-		deleteNonExistingPopups(popup_handles);
+		long[] popupHandles = popups(instance);
+		deleteNonExistingPopups(popupHandles);
+		
+		long[] minimizedToplevels = minimized(instance);
 		
 		// Reset surface visited state
 		for(WLCSurface surface : surfaces) {
@@ -179,18 +181,20 @@ public class WaylandCraftBridge {
 		
 		// Create new toplevels when necessary
 		// Update surface tree geometry of all toplevels
-		for(long handle : toplevel_handles) {
+		for(long handle : toplevelHandles) {
 			WLCToplevel toplevel = getOrCreateToplevel(handle);
 			WLCSurface root = toplevel.getSurfaceTree();
 			toplevel.lastChild = updateSurfaceTree(root);
 			updateGeometry(toplevel);
 			toplevel.title = toplevelTitle(toplevel.getHandle());
 			toplevel.appID = toplevelAppID(toplevel.getHandle());
+			
+			if(ArrayUtils.contains(minimizedToplevels, handle)) toplevel.minimized = true;
 		}
 		
 		// Create new popups when necessary
 		// Update surface tree geometry, parent relationships and offsets of all popups
-		for(long handle : popup_handles) {
+		for(long handle : popupHandles) {
 			WLCPopup popup = getOrCreatePopup(handle);
 			findPopupParent(popup);
 			
@@ -341,6 +345,8 @@ public class WaylandCraftBridge {
 	private static native String toplevelAppID(long handle);
 	// Interactive toplevel resize
 	private static native void toplevelResizeInt(long handle, int width, int height, boolean stop);
+	// Collect all toplevels that have sent a minimize request and clear the list
+	private static native long[] minimized(long instance);
 	
 	private static native long[] popups(long instance);
 	private static native long popupSurface(long instance, long handle);
