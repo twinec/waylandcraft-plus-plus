@@ -71,10 +71,15 @@ public class WindowManagerScreen extends Screen {
 		areaHeight = height - margin - topMargin;
 		scale = rootHeight / (float) areaHeight;
 		
-		selector = new SelectorWidget<WLCToplevel>(margin, topMargin - 14, areaWidth / 6, 15, 6) {
+		selector = new SelectorWidget<WLCToplevel>(margin, topMargin - 14, areaWidth / 5, 15, 5) {
 			@Override
 			public Component titleForElement(WLCToplevel element) {
 				return Component.literal(Optional.ofNullable(element.title).or(() -> Optional.ofNullable(element.appID)).orElse(""));
+			}
+			
+			@Override
+			public boolean elementDimColor(WLCToplevel element) {
+				return !wlc.hasWindowFor(element);
 			}
 		};
 		addRenderableWidget(selector);

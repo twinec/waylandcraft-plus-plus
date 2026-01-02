@@ -32,6 +32,7 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Camera;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -39,6 +40,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
 import net.minecraft.world.phys.Vec3;
 
 public class WaylandCraft implements ModInitializer, ClientModInitializer {
@@ -156,13 +158,15 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 			if(Minecraft.getInstance().options.hideGui) return;
 			
 			Font font = Minecraft.getInstance().font;
+			int yoff = 30;
+			int ystep = font.lineHeight + 2;
 			
 			if(WaylandCraft.instance.keyboardCaptured) {
 				String text = "KEYBOARD CAPTURED [PRESS F7]";
-				context.drawString(font, text, context.guiWidth() - font.width(text) - 10, 10, Color.red.getRGB(), false);
+				context.drawString(font, text, context.guiWidth() - font.width(text) - 10, yoff, Color.red.getRGB(), true);
+				yoff += ystep;
 			}
 			
-			int yoff = 10 + font.lineHeight;
 			for(WLCToplevel toplevel : WaylandCraft.instance.bridge.getToplevels()) {
 				String appID = toplevel.appID;
 				
@@ -174,15 +178,25 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 					if(xdgName != null) name = xdgName;
 				}
 				
+				Style style = Style.EMPTY;
+				Color color = Color.white;
+				
+				if(!hasWindowFor(toplevel)) {
+					color = Color.lightGray;
+				}
+				if(toplevel == bridge.getMostRecentFocus()) {
+					style = style.applyFormat(ChatFormatting.UNDERLINE);
+				}
+				
 				int x = context.guiWidth() - font.width(name) - 10;
-				context.drawString(font, name, x, yoff, Color.white.getRGB(), false);
+				context.drawString(font, Component.literal(name).withStyle(style), x, yoff, color.getRGB(), true);
 				
 				if(appID != null) {
 					IconData icon = xdgManager.getIcon(appID);
 					if(icon != null) renderBuffer(context, icon.texture, x - font.lineHeight - 2, yoff, font.lineHeight, font.lineHeight);
 				}
 				
-				yoff += font.lineHeight;
+				yoff += ystep;
 			}
 		});
 		
