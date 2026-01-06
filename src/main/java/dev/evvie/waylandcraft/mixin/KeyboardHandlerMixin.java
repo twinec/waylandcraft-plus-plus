@@ -1,5 +1,6 @@
 package dev.evvie.waylandcraft.mixin;
 
+import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -12,8 +13,15 @@ import net.minecraft.client.KeyboardHandler;
 public class KeyboardHandlerMixin {
 	
 	@Inject(method = "keyPress", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/InputConstants;getKey(II)Lcom/mojang/blaze3d/platform/InputConstants$Key;"), cancellable = true)
-	public void onPress(long windowHandle, int key, int scancode, int action, int modifiers, CallbackInfo info) {
+	public void onPressInGame(long windowHandle, int key, int scancode, int action, int modifiers, CallbackInfo info) {
 		if(WaylandCraft.instance.onKeyPress(windowHandle, key, scancode, action, modifiers)) info.cancel();
+	}
+	
+	@Inject(method = "keyPress", at = @At("HEAD"), cancellable = false)
+	public void onPressGlobal(long windowHandle, int key, int scancode, int action, int modifiers, CallbackInfo info) {
+		if(action != GLFW.GLFW_PRESS && action != GLFW.GLFW_RELEASE) return;
+		if(WaylandCraft.instance.bridge == null) return;
+		WaylandCraft.instance.bridge.internalKeyUpdate(scancode, action == GLFW.GLFW_PRESS);
 	}
 	
 }

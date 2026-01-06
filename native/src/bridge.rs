@@ -939,6 +939,22 @@ fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_keyboardInput<'l>(
 
 #[unsafe(no_mangle)]
 pub extern "system"
+fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_keyboardUpdate<'l>(
+    _env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    ptr: jlong,
+    scancode: jint,
+    press: jboolean
+) {
+    let instance = jptr_to_instance(ptr);
+    instance.state.seat.keyboard_update_xkb(
+        scancode as u32,
+        press == JNI_TRUE,
+    );
+}
+
+#[unsafe(no_mangle)]
+pub extern "system"
 fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_checkInputRegion<'l>(
     _env: JNIEnv<'l>,
     _class: JClass<'l>,

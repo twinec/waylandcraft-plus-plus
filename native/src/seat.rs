@@ -19,12 +19,14 @@ use smithay::{
         },
     },
 };
-use xkbcommon::xkb::{self, Context, Keymap};
+use xkbcommon::xkb::{self, Keymap};
 
 pub struct WLCSeatState {
     pub pointers: Vec<WlPointer>,
     pub keyboards: Vec<WlKeyboard>,
     pub keymap_file: SealedFile,
+    pub xkb_context: xkb::Context,
+    pub xkb_state: xkb::State,
 }
 
 pub struct WLCPointerData {
@@ -73,7 +75,7 @@ fn new_serial() -> u32 {
 
 impl WLCSeatState {
     pub fn new() -> Self {
-        let xkb_context = Context::new(xkb::CONTEXT_NO_FLAGS);
+        let xkb_context = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
         let keymap = Keymap::new_from_names(
             &xkb_context,
             "", // rules
@@ -90,10 +92,14 @@ impl WLCSeatState {
             &CString::new(keymap_str.as_str()).unwrap()
         ).expect("SealedFile create");
 
+        let xkb_state = xkb::State::new(&keymap);
+
         WLCSeatState {
             pointers: vec![],
             keyboards: vec![],
             keymap_file,
+            xkb_context,
+            xkb_state,
         }
     }
 
@@ -170,6 +176,15 @@ impl WLCSeatState {
         });
     }
 
+    pub fn keyboard_update_xkb(&mut self, key: u32, pressed: bool) {
+        let dir = match pressed {
+            true => xkb::KeyDirection::Down,
+            false => xkb::KeyDirection::Up,
+        };
+        let code = xkb::Keycode::new(key);
+        self.xkb_state.update_key(code, dir);
+    }
+
     pub fn keyboard_focus(&self, surface: WlSurface) {
         if !surface.is_alive() { return };
         let client = surface.client().unwrap();
@@ -209,14 +224,18 @@ impl WLCSeatState {
             keyboard.enter(new_serial(), &surface, pressed);
             data.focus = Some(surface.clone());
 
-            keyboard.modifiers(
-                new_serial(),
-                0, // mods_depressed
-                0, // mods_latched
-                0, // mods_locked
-                0 // group
-            );
+            self.send_modifiers(&keyboard);
         });
+    }
+
+    fn send_modifiers(&self, keyboard: &WlKeyboard) {
+        keyboard.modifiers(
+            new_serial(),
+            self.xkb_state.serialize_mods(xkb::STATE_MODS_DEPRESSED),
+            self.xkb_state.serialize_mods(xkb::STATE_MODS_LATCHED),
+            self.xkb_state.serialize_mods(xkb::STATE_MODS_LOCKED),
+            self.xkb_state.serialize_layout(xkb::STATE_LAYOUT_EFFECTIVE)
+        );
     }
 
     pub fn keyboard_unfocus(&self) {
@@ -232,6 +251,7 @@ impl WLCSeatState {
         self.for_all_keyboards(|keyboard, data| {
             if data.focus.is_some() {
                 keyboard.key(new_serial(), get_time(), key - 8, state);
+                self.send_modifiers(&keyboard);
             }
         });
     }

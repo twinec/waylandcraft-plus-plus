@@ -354,6 +354,10 @@ public class WaylandCraftBridge {
 		keyboardInput(instance, scancode, 0);
 	}
 	
+	public void internalKeyUpdate(int scancode, boolean pressed) {
+		keyboardUpdate(instance, scancode, pressed);
+	}
+	
 	public void resizeToplevelInteractive(WLCToplevel toplevel, int width, int height) {
 		toplevelResize(toplevel.getHandle(), width, height, true);
 	}
@@ -428,6 +432,9 @@ public class WaylandCraftBridge {
 	
 	// Keyboard input. scancode is the raw keycode. action: 0 is released, 1 is pressed.
 	private static native void keyboardInput(long instance, int scancode, int action);
+	
+	// Update internal key state
+	private static native void keyboardUpdate(long instance, int scancode, boolean pressed);
 	
 	private static native void freeSurface(long instance, long handle);
 	private static native void freeToplevel(long instance, long handle);
