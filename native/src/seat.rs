@@ -165,6 +165,22 @@ impl WLCSeatState {
         });
     }
 
+    // Emit relative movement on the surface with active pointer focus
+    pub fn pointer_relative_motion(&self, dx: f64, dy: f64) {
+        self.for_all_pointers(|_pointer, data| {
+            if !data.focus.is_some() { return }
+            if let Some(relative_pointer) = &data.relative_pointer {
+                let time = (get_time() as u64) * 1000; // ms to µs
+                relative_pointer.relative_motion(
+                    (time >> 32) as u32, // utime_hi
+                    (time & 0xffffffff) as u32, // utime_lo
+                    dx, dy, // dx, dy
+                    dx, dy // dx_unaccel, dy_unaccel
+                );
+            }
+        });
+    }
+
     pub fn pointer_button(&self, button: u32, state: ButtonState) {
         self.for_all_pointers(|pointer, data| {
             if data.focus.is_some() {

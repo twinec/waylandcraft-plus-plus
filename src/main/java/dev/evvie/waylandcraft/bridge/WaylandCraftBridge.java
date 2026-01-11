@@ -303,6 +303,10 @@ public class WaylandCraftBridge {
 		pointerMotion(instance, surface.getHandle(), x, y);
 	}
 	
+	public void sendRelativeMotion(double dx, double dy) {
+		pointerRelMotion(instance, dx, dy);
+	}
+	
 	public void sendMotionOutside() {
 		pointerLeave(instance);
 	}
@@ -419,6 +423,9 @@ public class WaylandCraftBridge {
 	
 	// Create pointer motion event
 	private static native void pointerMotion(long instance, long handle, double x, double y);
+	
+	// Send relative pointer motion to surface with pointer focus
+	private static native void pointerRelMotion(long instance, double dx, double dy);
 	
 	// Remove pointer focus from all surfaces
 	private static native void pointerLeave(long instance);
