@@ -235,7 +235,7 @@ fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_popups<'l>(
 
 #[unsafe(no_mangle)]
 pub extern "system"
-fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_minimized<'l>(
+fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_minimizeReq<'l>(
     env: JNIEnv<'l>,
     _class: JClass<'l>,
     ptr: jlong
@@ -244,13 +244,14 @@ fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_minimized<'l>(
 
     let handles: Vec<jlong> = instance
         .state
-        .minimized_toplevels
+        .requests
+        .minimize
         .iter()
         .filter(|t| t.alive())
         .map(|t| insert_get_handle(&mut instance.bridge.toplevels, t))
         .collect();
 
-    instance.state.minimized_toplevels.clear();
+    instance.state.requests.minimize.clear();
 
     let array = env.new_long_array(handles.len() as jsize).unwrap();
     env.set_long_array_region(&array, 0, &handles).unwrap();
@@ -259,7 +260,7 @@ fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_minimized<'l>(
 
 #[unsafe(no_mangle)]
 pub extern "system"
-fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_maximized<'l>(
+fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_maximizeReq<'l>(
     env: JNIEnv<'l>,
     _class: JClass<'l>,
     ptr: jlong
@@ -268,13 +269,14 @@ fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_maximized<'l>(
 
     let handles: Vec<jlong> = instance
         .state
-        .maximized_toplevels
+        .requests
+        .maximize
         .iter()
         .filter(|t| t.alive())
         .map(|t| insert_get_handle(&mut instance.bridge.toplevels, t))
         .collect();
 
-    instance.state.maximized_toplevels.clear();
+    instance.state.requests.maximize.clear();
 
     let array = env.new_long_array(handles.len() as jsize).unwrap();
     env.set_long_array_region(&array, 0, &handles).unwrap();
@@ -283,7 +285,7 @@ fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_maximized<'l>(
 
 #[unsafe(no_mangle)]
 pub extern "system"
-fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_unmaximized<'l>(
+fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_unmaximizeReq<'l>(
     env: JNIEnv<'l>,
     _class: JClass<'l>,
     ptr: jlong
@@ -292,13 +294,64 @@ fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_unmaximized<'l>(
 
     let handles: Vec<jlong> = instance
         .state
-        .unmaximized_toplevels
+        .requests
+        .unmaximize
         .iter()
         .filter(|t| t.alive())
         .map(|t| insert_get_handle(&mut instance.bridge.toplevels, t))
         .collect();
 
-    instance.state.unmaximized_toplevels.clear();
+    instance.state.requests.unmaximize.clear();
+
+    let array = env.new_long_array(handles.len() as jsize).unwrap();
+    env.set_long_array_region(&array, 0, &handles).unwrap();
+    array.into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "system"
+fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_fullscreenReq<'l>(
+    env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    ptr: jlong
+) -> jarray {
+    let instance = jptr_to_instance(ptr);
+
+    let handles: Vec<jlong> = instance
+        .state
+        .requests
+        .fullscreen
+        .iter()
+        .filter(|t| t.alive())
+        .map(|t| insert_get_handle(&mut instance.bridge.toplevels, t))
+        .collect();
+
+    instance.state.requests.fullscreen.clear();
+
+    let array = env.new_long_array(handles.len() as jsize).unwrap();
+    env.set_long_array_region(&array, 0, &handles).unwrap();
+    array.into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "system"
+fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_unfullscreenReq<'l>(
+    env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    ptr: jlong
+) -> jarray {
+    let instance = jptr_to_instance(ptr);
+
+    let handles: Vec<jlong> = instance
+        .state
+        .requests
+        .unfullscreen
+        .iter()
+        .filter(|t| t.alive())
+        .map(|t| insert_get_handle(&mut instance.bridge.toplevels, t))
+        .collect();
+
+    instance.state.requests.unfullscreen.clear();
 
     let array = env.new_long_array(handles.len() as jsize).unwrap();
     env.set_long_array_region(&array, 0, &handles).unwrap();
@@ -1121,6 +1174,7 @@ fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_toplevelResize<'l>(
     toplevel.with_pending_state(|state| {
         state.size = Some(Size::new(width, height));
         state.states.unset(xdg_toplevel::State::Maximized);
+        state.states.unset(xdg_toplevel::State::Fullscreen);
         if interactive == JNI_TRUE {
             state.states.set(xdg_toplevel::State::Resizing);
         } else {
@@ -1140,10 +1194,27 @@ fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_toplevelMaximize<'l>(
     let toplevel = jptr_to_toplevel(handle);
 
     toplevel.with_pending_state(|state| {
+        if state.states.contains(xdg_toplevel::State::Fullscreen) { return }
         state.size = Some(Size::new(1920, 1080));
         state.states.set(xdg_toplevel::State::Maximized);
     });
-    toplevel.send_pending_configure();
+    toplevel.send_configure();
+}
+
+#[unsafe(no_mangle)]
+pub extern "system"
+fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_toplevelFullscreen<'l>(
+    _env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    handle: jlong
+) {
+    let toplevel = jptr_to_toplevel(handle);
+
+    toplevel.with_pending_state(|state| {
+        state.size = Some(Size::new(1920, 1080));
+        state.states.set(xdg_toplevel::State::Fullscreen);
+    });
+    toplevel.send_configure();
 }
 
 #[unsafe(no_mangle)]

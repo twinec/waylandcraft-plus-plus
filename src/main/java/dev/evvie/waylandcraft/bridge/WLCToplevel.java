@@ -19,8 +19,14 @@ public class WLCToplevel extends WLCAbstractWindow {
 	// Set to true when a toplevel requests to be unmaximized
 	public boolean unmaximizeRequest = false;
 	
+	// Set to true when a toplevel requests to be fullscreened
+	public boolean fullscreenRequest = false;
+	
+	// Set to true when a toplevel requests to be unfullscreened
+	public boolean unfullscreenRequest = false;
+	
 	@Nullable
-	public SurfaceGeometry maximizeRestoreGeometry = null;
+	public SurfaceGeometry restoreGeometry = null;
 	
 	public WLCToplevel(long handle) {
 		super(handle);

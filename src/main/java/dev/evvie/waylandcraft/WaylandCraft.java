@@ -110,24 +110,48 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 			for(WLCToplevel toplevel : bridge.getToplevels()) {
 				if(toplevel.maximizeRequest && toplevel.unmaximizeRequest) {
 					// Both requests shouldn't happen at the same time
-					toplevel.maximizeRestoreGeometry = null;
+					toplevel.restoreGeometry = null;
 				}
 				else if(toplevel.maximizeRequest) {
 					// Maximize toplevel and store its old geometry
-					toplevel.maximizeRestoreGeometry = toplevel.geometry;
+					toplevel.restoreGeometry = toplevel.geometry;
 					bridge.maximizeToplevel(toplevel);
 				}
 				else if(toplevel.unmaximizeRequest) {
 					// Unmaximize toplevel and attempt to restore old geometry
-					SurfaceGeometry newGeometry = toplevel.maximizeRestoreGeometry;
+					SurfaceGeometry newGeometry = toplevel.restoreGeometry;
 					if(newGeometry == null) newGeometry = toplevel.geometry;
 					
 					// resizeToplevel also unsets the maximize flag
 					bridge.resizeToplevel(toplevel, newGeometry.width(), newGeometry.height());
-					toplevel.maximizeRestoreGeometry = null;
+					toplevel.restoreGeometry = null;
 				}
 				
 				toplevel.maximizeRequest = toplevel.unmaximizeRequest = false;
+			}
+			
+			// Handle any fullscreen or unfullscreen requests
+			for(WLCToplevel toplevel : bridge.getToplevels()) {
+				if(toplevel.fullscreenRequest && toplevel.unfullscreenRequest) {
+					// Both requests shouldn't happen at the same time
+					toplevel.restoreGeometry = null;
+				}
+				else if(toplevel.fullscreenRequest) {
+					// Fullscreen toplevel and store its old geometry
+					toplevel.restoreGeometry = toplevel.geometry;
+					bridge.fullscreenToplevel(toplevel);
+				}
+				else if(toplevel.unfullscreenRequest) {
+					// Unfullscreen toplevel and attempt to restore old geometry
+					SurfaceGeometry newGeometry = toplevel.restoreGeometry;
+					if(newGeometry == null) newGeometry = toplevel.geometry;
+					
+					// resizeToplevel also unsets the fullscreen flag
+					bridge.resizeToplevel(toplevel, newGeometry.width(), newGeometry.height());
+					toplevel.restoreGeometry = null;
+				}
+				
+				toplevel.fullscreenRequest = toplevel.unfullscreenRequest = false;
 			}
 			
 			if(grabbedDisplay != null && !grabbedDisplay.isAlive()) grabbedDisplay = null;

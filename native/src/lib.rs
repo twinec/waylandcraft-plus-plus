@@ -18,6 +18,7 @@ use smithay::{
                 wl_surface::WlSurface,
                 wl_buffer::WlBuffer,
                 wl_seat::WlSeat,
+                wl_output::WlOutput,
             },
             Display, DisplayHandle,
         },
@@ -80,10 +81,17 @@ pub struct WLCState {
     pub single_pixel_buffer_state: SinglePixelBufferState,
     pub dmabuf_state: DmabufState,
     pub dmabuf_global: DmabufGlobal,
+    pub requests: WindowRequests,
     pub seat: WLCSeatState,
-    pub minimized_toplevels: Vec<ToplevelSurface>,
-    pub maximized_toplevels: Vec<ToplevelSurface>,
-    pub unmaximized_toplevels: Vec<ToplevelSurface>,
+}
+
+#[derive(Default)]
+pub struct WindowRequests {
+    pub minimize: Vec<ToplevelSurface>,
+    pub maximize: Vec<ToplevelSurface>,
+    pub unmaximize: Vec<ToplevelSurface>,
+    pub fullscreen: Vec<ToplevelSurface>,
+    pub unfullscreen: Vec<ToplevelSurface>,
 }
 
 impl WLCState {
@@ -94,6 +102,7 @@ impl WLCState {
         let viewporter_state = ViewporterState::new::<WLCState>(&disp);
         let single_pixel_buffer_state =
             SinglePixelBufferState::new::<WLCState>(&disp);
+        register_virtual_output(&disp);
 
         let mut dmabuf_state = DmabufState::new();
         let dmabuf_global = init_dmabuf(&disp, &mut dmabuf_state, egl);
@@ -113,10 +122,8 @@ impl WLCState {
             single_pixel_buffer_state,
             dmabuf_state,
             dmabuf_global,
+            requests: WindowRequests::default(),
             seat,
-            minimized_toplevels: vec![],
-            maximized_toplevels: vec![],
-            unmaximized_toplevels: vec![],
         }
     }
 }
@@ -232,15 +239,27 @@ impl XdgShellHandler for WLCState {
     }
 
     fn minimize_request(&mut self, surface: ToplevelSurface) {
-        self.minimized_toplevels.push(surface);
+        self.requests.minimize.push(surface);
     }
 
     fn maximize_request(&mut self, surface: ToplevelSurface) {
-        self.maximized_toplevels.push(surface);
+        self.requests.maximize.push(surface);
     }
 
     fn unmaximize_request(&mut self, surface: ToplevelSurface) {
-        self.unmaximized_toplevels.push(surface);
+        self.requests.unmaximize.push(surface);
+    }
+
+    fn fullscreen_request(
+        &mut self,
+        surface: ToplevelSurface,
+        _output: Option<WlOutput>
+    ) {
+        self.requests.fullscreen.push(surface);
+    }
+
+    fn unfullscreen_request(&mut self, surface: ToplevelSurface) {
+        self.requests.unfullscreen.push(surface);
     }
 }
 
@@ -272,7 +291,7 @@ pub fn get_time() -> u32 {
     time as u32
 }
 
-fn register_virtual_output(state: &mut WLCState) {
+fn register_virtual_output(disp: &DisplayHandle) {
     let output = Output::new(
         "output-0".into(),
         PhysicalProperties {
@@ -282,13 +301,15 @@ fn register_virtual_output(state: &mut WLCState) {
             model: "Monitor".into(),
         },
     );
+    let mode = output::Mode { size: (1920, 1080).into(), refresh: 60000 };
+    output.set_preferred(mode);
     output.change_current_state(
-        Some(output::Mode { size: (1920, 1080).into(), refresh: 60000 }),
+        Some(mode),
         None,
         None,
         Some((0, 0).into())
     );
-    output.create_global::<WLCState>(&state.display_handle);
+    output.create_global::<WLCState>(&disp);
 }
 
 pub(crate) fn wlc_init(
@@ -300,8 +321,6 @@ pub(crate) fn wlc_init(
 
     let mut state = WLCState::new(display.handle(), &egl);
     state.socket = socket.socket_name().to_os_string();
-
-    register_virtual_output(&mut state);
 
     let ev_handle = event_loop.handle();
 
