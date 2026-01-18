@@ -12,6 +12,7 @@ import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWNativeEGL;
 
 import dev.evvie.waylandcraft.BufferTexture.DmabufTexture;
+import dev.evvie.waylandcraft.WaylandCraft;
 import dev.evvie.waylandcraft.WindowFramebuffer;
 import dev.evvie.waylandcraft.bridge.WLCAbstractWindow.SurfaceGeometry;
 import net.minecraft.client.Minecraft;
@@ -256,6 +257,7 @@ public class WaylandCraftBridge {
 		deleteNonExistingDmabufs(dmabufs(instance));
 		
 		updateFocusOrder();
+		updateClipboard();
 		
 		// Do client frame callbacks
 		sendFrame(instance);
@@ -331,11 +333,19 @@ public class WaylandCraftBridge {
 		pointerAxis(instance, axis, value);
 	}
 	
+	private WLCToplevel lastKeyboardFocus = null;
 	public void focusSurface(@Nullable WLCToplevel toplevel) {
 		long handle = 0;
 		if(toplevel != null) {
 			handle = toplevel.getHandle();
 		}
+		
+		if(toplevel != lastKeyboardFocus && toplevel != null) {
+			WaylandCraft.LOGGER.info("FOCUS CHANGED: " + toplevel + ", old: " + lastKeyboardFocus);
+			sendClipboard(instance, handle);
+		}
+		lastKeyboardFocus = toplevel;
+		
 		keyboardFocus(instance, handle);
 		
 		// Make toplevel most recently focused
@@ -343,6 +353,19 @@ public class WaylandCraftBridge {
 			focusOrder.remove(toplevel);
 			focusOrder.addLast(toplevel);
 		}
+	}
+	
+	private String clipboardData = null;
+	public void updateClipboard() {
+		String currentClipboard = getClipboardData(instance);
+		
+		if(lastKeyboardFocus != null && !lastKeyboardFocus.isAlive()) lastKeyboardFocus = null;
+		
+		if(currentClipboard != null && !currentClipboard.equals(clipboardData) && lastKeyboardFocus != null) {
+			WaylandCraft.LOGGER.info("CLIPBOARD CHANGED: '" + currentClipboard + "', old: '" + clipboardData + "'");
+			sendClipboard(instance, lastKeyboardFocus.getHandle());
+		}
+		clipboardData = currentClipboard;
 	}
 	
 	private void updateFocusOrder() {
@@ -471,6 +494,10 @@ public class WaylandCraftBridge {
 	
 	// Update internal key state
 	private static native void keyboardUpdate(long instance, int scancode, boolean pressed);
+	
+	private static native void sendClipboard(long instance, long handle);
+	private static native void setClipboardData(long instance, String data);
+	private static native String getClipboardData(long instance);
 	
 	private static native void freeSurface(long instance, long handle);
 	private static native void freeToplevel(long instance, long handle);

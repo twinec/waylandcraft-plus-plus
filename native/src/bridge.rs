@@ -32,12 +32,13 @@ use smithay::{
                 wl_pointer::{ButtonState, Axis},
                 wl_keyboard::KeyState,
             },
+            Resource,
         },
         wayland_protocols::xdg::shell::server::xdg_toplevel,
     },
 };
 use jni::{
-    objects::{JClass, JObject, JValue},
+    objects::{JClass, JObject, JValue, JString},
     sys::{
         jlong, jstring, jarray, jsize, jint, jvalue, jdouble, jboolean, jobject,
         jbyte, JNI_TRUE
@@ -1056,6 +1057,52 @@ fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_keyboardUpdate<'l>(
         scancode as u32,
         press == JNI_TRUE,
     );
+}
+
+#[unsafe(no_mangle)]
+pub extern "system"
+fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_sendClipboard<'l>(
+    _env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    ptr: jlong,
+    handle: jlong
+) {
+    let instance = jptr_to_instance(ptr);
+    let toplevel = jptr_to_toplevel(handle);
+
+    let client = match toplevel.wl_surface().client() {
+        Some(c) => c,
+        None => return,
+    };
+
+    instance.state.data.send_clipboard(client);
+}
+
+#[unsafe(no_mangle)]
+pub extern "system"
+fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_setClipboardData<'l>(
+    mut env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    ptr: jlong,
+    data: JString<'l>
+) {
+    let instance = jptr_to_instance(ptr);
+    let clipboard = env.get_string(&data).unwrap().into();
+    instance.state.data.clipboard = Some(clipboard);
+}
+
+#[unsafe(no_mangle)]
+pub extern "system"
+fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_getClipboardData<'l>(
+    env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    ptr: jlong
+) -> jstring {
+    let instance = jptr_to_instance(ptr);
+    match &instance.state.data.clipboard {
+        Some(data) => env.new_string(data).unwrap().into_raw(),
+        None => std::ptr::null_mut(),
+    }
 }
 
 #[unsafe(no_mangle)]

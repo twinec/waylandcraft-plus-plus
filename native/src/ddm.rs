@@ -89,6 +89,7 @@ impl WLCDataState {
                     WlDataOffer, (), WLCState
                 >(&self.display_handle, device.version(), ()).unwrap();
 
+                println!("Sending selection");
                 device.data_offer(&offer);
                 offer.offer(CLIPBOARD_MIME.into());
                 device.selection(Some(&offer));
@@ -261,6 +262,8 @@ impl Dispatch<WlDataOffer, ()> for WLCState {
     ) {
         match request {
             wl_data_offer::Request::Receive { mime_type, fd } => {
+                println!("CLIPBOARD RECEIVE REQUEST '{}', have '{:#?}'",
+                    mime_type, state.data.clipboard);
                 if mime_type != CLIPBOARD_MIME {
                     return;
                 }
@@ -269,6 +272,10 @@ impl Dispatch<WlDataOffer, ()> for WLCState {
                         .expect("wl_data_offer write");
                 }
             },
+            wl_data_offer::Request::Accept { .. } => {},
+            wl_data_offer::Request::Destroy { .. } => {},
+            wl_data_offer::Request::Finish { .. } => {},
+            wl_data_offer::Request::SetActions { .. } => {},
             _ => unreachable!(),
         }
     }
