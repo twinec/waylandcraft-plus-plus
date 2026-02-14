@@ -224,7 +224,7 @@ impl Dispatch<WlDataSource, WLCDataSource> for WLCState {
 impl Dispatch<WlDataDevice, WLCDataDevice> for WLCState {
     fn request(
         state: &mut Self,
-        _client: &Client,
+        client: &Client,
         _device: &WlDataDevice,
         request: wl_data_device::Request,
         _data: &WLCDataDevice,
@@ -234,6 +234,11 @@ impl Dispatch<WlDataDevice, WLCDataDevice> for WLCState {
         match request {
             wl_data_device::Request::StartDrag { .. } => {},
             wl_data_device::Request::SetSelection { source, serial: _ } => {
+                let focus = state.data.clipboard_focus.as_ref();
+                if !focus.is_some_and(|c| c == client) {
+                    return;
+                }
+
                 if let Some(source) = &source {
                     let mime = with_source_data(source, |data| {
                         data.mime.clone()
