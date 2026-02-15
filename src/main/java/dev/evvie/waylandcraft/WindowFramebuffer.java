@@ -69,9 +69,6 @@ public class WindowFramebuffer {
 	}
 	
 	private void render() {
-		int fbo = GL33.glGenFramebuffers();
-		GL33.glBindFramebuffer(GL33.GL_FRAMEBUFFER, fbo);
-		
 		tex = GL33.glGenTextures();
 		GL33.glBindTexture(GL33.GL_TEXTURE_2D, tex);
 		GL33.nglTexImage2D(GL33.GL_TEXTURE_2D, 0, GL33.GL_RGBA, width, height, 0, GL33.GL_RGBA, GL33.GL_UNSIGNED_BYTE, 0);
@@ -79,6 +76,10 @@ public class WindowFramebuffer {
 		GL33.glTexParameteri(GL33.GL_TEXTURE_2D, GL33.GL_TEXTURE_MAG_FILTER, GL33.GL_NEAREST);
 		GL33.glBindTexture(GL33.GL_TEXTURE_2D, 0);
 		
+		if(width == 0 || height == 0) return;
+		
+		int fbo = GL33.glGenFramebuffers();
+		GL33.glBindFramebuffer(GL33.GL_FRAMEBUFFER, fbo);
 		GL33.glFramebufferTexture2D(GL33.GL_FRAMEBUFFER, GL33.GL_COLOR_ATTACHMENT0, GL33.GL_TEXTURE_2D, tex, 0);
 		
 		int depth_stencil_rbo = GL33.glGenRenderbuffers();
@@ -92,6 +93,18 @@ public class WindowFramebuffer {
 			WaylandCraft.LOGGER.error("Failed to create framebuffer!");
 		}
 		
+		int vaoRestore = GL33.glGetInteger(GL33.GL_VERTEX_ARRAY_BINDING);
+		
+		drawSurfaces();
+		
+		GL33.glBindVertexArray(vaoRestore);
+		Minecraft.getInstance().getMainRenderTarget().bindWrite(true);
+		
+		GL33.glDeleteRenderbuffers(depth_stencil_rbo);
+		GL33.glDeleteFramebuffers(fbo);
+	}
+	
+	private void drawSurfaces() {
 		GL33.glViewport(0, 0, width, height);
 		GL33.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 		GL33.glClear(GL33.GL_COLOR_BUFFER_BIT | GL33.GL_DEPTH_BUFFER_BIT);
@@ -102,7 +115,6 @@ public class WindowFramebuffer {
 		GL33.glEnable(GL33.GL_BLEND);
 		GL33.glBlendFunc(GL33.GL_SRC_ALPHA, GL33.GL_ONE_MINUS_SRC_ALPHA);
 		
-		int vaoRestore = GL33.glGetInteger(GL33.GL_VERTEX_ARRAY_BINDING);
 		int vao = GL33.glGenVertexArrays();
 		GL33.glBindVertexArray(vao);
 		
@@ -110,16 +122,9 @@ public class WindowFramebuffer {
 			renderSurface(surface, xoff + surface.xSubpos, yoff + surface.ySubpos);
 		}
 		
-		GL33.glBindVertexArray(vaoRestore);
 		GL33.glDeleteVertexArrays(vao);
-		
 		GL33.glDisable(GL33.GL_BLEND);
 		GL33.glDepthFunc(GL33.GL_LEQUAL);
-		
-		Minecraft.getInstance().getMainRenderTarget().bindWrite(true);
-		
-		GL33.glDeleteRenderbuffers(depth_stencil_rbo);
-		GL33.glDeleteFramebuffers(fbo);
 	}
 	
 	public void freeTexture() {
