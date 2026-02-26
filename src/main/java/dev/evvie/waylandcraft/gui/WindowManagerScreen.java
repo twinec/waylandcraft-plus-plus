@@ -9,7 +9,6 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL33;
 
-import dev.evvie.waylandcraft.BufferTexture;
 import dev.evvie.waylandcraft.RenderUtils;
 import dev.evvie.waylandcraft.WaylandCraft;
 import dev.evvie.waylandcraft.WindowFramebuffer;
@@ -86,11 +85,11 @@ public class WindowManagerScreen extends Screen {
 			}
 			
 			@Override
-			public @Nullable BufferTexture iconForElement(WLCToplevel element) {
+			public @Nullable ResourceLocation iconForElement(WLCToplevel element) {
 				String appID = element.appID;
 				if(appID == null) return null;
 				
-				BufferTexture icon = wlc.xdgManager.getIcon(appID);
+				ResourceLocation icon = wlc.xdgManager.getIcon(appID);
 				if(icon == null) return null;
 				
 				return icon;

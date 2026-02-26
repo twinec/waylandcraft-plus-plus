@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL33;
 
-import dev.evvie.waylandcraft.BufferTexture;
 import dev.evvie.waylandcraft.RenderUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -81,7 +80,7 @@ public abstract class SelectorWidget<T> extends AbstractWidget {
 	}
 	
 	public abstract Component titleForElement(T element);
-	public abstract @Nullable BufferTexture iconForElement(T element);
+	public abstract @Nullable ResourceLocation iconForElement(T element);
 	public abstract boolean elementDimColor(T element);
 	
 	public T selection() {
@@ -143,7 +142,7 @@ public abstract class SelectorWidget<T> extends AbstractWidget {
 		public T element = null;
 		public boolean selected = false;
 		public boolean dimColor = false;
-		public BufferTexture icon = null;
+		public ResourceLocation icon = null;
 		
 		@SuppressWarnings("unchecked")
 		public SelectorButton(SelectorWidget<T> widget, int x, int y, int width, int height) {
@@ -174,7 +173,7 @@ public abstract class SelectorWidget<T> extends AbstractWidget {
 			
 			if(icon != null) {
 				GL33.glEnable(GL33.GL_BLEND);
-				RenderUtils.blitGUI(context, icon.id, xoff, y + 2, xoff + iconSize, y + 2 + iconSize);
+				RenderUtils.blitGUI(context, icon, xoff, y + 2, xoff + iconSize, y + 2 + iconSize);
 				GL33.glDisable(GL33.GL_BLEND);
 				xoff += iconSize + 2;
 			}

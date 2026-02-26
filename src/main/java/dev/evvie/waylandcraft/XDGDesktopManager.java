@@ -1,20 +1,23 @@
 package dev.evvie.waylandcraft;
 
-import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.HashMap;
 
-import javax.imageio.ImageIO;
+import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.platform.TextureUtil;
 
-import org.lwjgl.system.jni.JNINativeInterface;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.client.renderer.texture.TextureManager;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.ResourceManager;
 
 public class XDGDesktopManager {
 	
 	private HashMap<String, String> nameCache = new HashMap<String, String>();
-	private HashMap<String, BufferTexture> iconCache = new HashMap<String, BufferTexture>();
+	private HashMap<String, ResourceLocation> iconCache = new HashMap<String, ResourceLocation>();
 	
 	public String getName(String appID) {
 		if(appID == null) return null;
@@ -28,19 +31,27 @@ public class XDGDesktopManager {
 		return name;
 	}
 	
-	public BufferTexture getIcon(String appID) {
+	public ResourceLocation getIcon(String appID) {
 		if(appID == null) return null;
 		
 		if(iconCache.containsKey(appID)) {
 			return iconCache.get(appID);
 		}
 		
-		BufferTexture icon = tryRetrieveIcon(appID);
-		iconCache.put(appID, icon);
-		return icon;
+		ResourceLocation location = null;
+		IconTexture icon = tryRetrieveIcon(appID);
+		if(icon != null) {
+			TextureManager textureManager = Minecraft.getInstance().getTextureManager();
+			location = new ResourceLocation(WaylandCraft.MOD_ID, "icon_" + appID);
+			
+			textureManager.register(location, icon);
+		}
+		
+		iconCache.put(appID, location);
+		return location;
 	}
 	
-	private BufferTexture tryRetrieveIcon(String appID) {
+	private IconTexture tryRetrieveIcon(String appID) {
 		try {
 			return retrieveIcon(appID);
 		} catch (IOException e) {
@@ -57,7 +68,7 @@ public class XDGDesktopManager {
 		return path.substring(idx + 1);
 	}
 	
-	private BufferTexture retrieveIcon(String appID) throws IOException {
+	private IconTexture retrieveIcon(String appID) throws IOException {
 		String iconPath = WaylandCraft.instance.bridge.resolveIconPath(appID);
 		System.out.println("Found icon path: " + iconPath);
 		
@@ -74,20 +85,32 @@ public class XDGDesktopManager {
 			return null;
 		}
 		
-		BufferedImage image = ImageIO.read(iconFile);
-		int width = image.getWidth();
-		int height = image.getHeight();
-		int[] pixels = image.getRGB(0, 0, width, height, null, 0, width);
+		return new IconTexture(iconFile);
+	}
+	
+	public static class IconTexture extends AbstractTexture {
 		
-		ByteBuffer buf = ByteBuffer.allocateDirect(pixels.length * 4);
-		buf.order(ByteOrder.LITTLE_ENDIAN);
-		for(int pixel : pixels) {
-			buf.putInt(pixel);
-	    }
-		buf.flip();
+		private final NativeImage image;
 		
-		BufferTexture texture = new BufferTexture.ShmBufferTexture(JNINativeInterface.GetDirectBufferAddress(buf), width, height, BufferTexture.FORMAT_ARGB8888);
-		return texture;
+		public IconTexture(File file) throws IOException {
+			FileInputStream stream = new FileInputStream(file);
+			image = NativeImage.read(stream);
+			TextureUtil.prepareImage(getId(), image.getWidth(), image.getHeight());
+			image.upload(0, 0, 0, false);
+		}
+		
+		@Override
+		public void load(ResourceManager resourceManager) throws IOException {
+		}
+		
+		@Override
+		public void close() {
+			if(image != null) {
+				image.close();
+				releaseId();
+			}
+		}
+		
 	}
 	
 }

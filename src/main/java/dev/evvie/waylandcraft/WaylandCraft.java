@@ -36,6 +36,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 
@@ -225,13 +226,13 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 				context.drawString(font, Component.literal(name).withStyle(style), x, yoff, color.getRGB(), true);
 				
 				if(appID != null) {
-					BufferTexture icon = xdgManager.getIcon(appID);
+					ResourceLocation icon = xdgManager.getIcon(appID);
 					int iconX = x - font.lineHeight - 2;
 					int iconY = yoff;
 					int iconW = font.lineHeight;
 					int iconH = font.lineHeight;
 					GL33.glEnable(GL33.GL_BLEND);
-					if(icon != null) RenderUtils.blitGUI(context, icon.id, iconX, iconY, iconX + iconW, iconY + iconH);
+					if(icon != null) RenderUtils.blitGUI(context, icon, iconX, iconY, iconX + iconW, iconY + iconH);
 					GL33.glDisable(GL33.GL_BLEND);
 				}
 				

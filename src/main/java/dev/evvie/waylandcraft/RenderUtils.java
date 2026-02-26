@@ -69,6 +69,23 @@ public class RenderUtils {
 		BufferUploader.drawWithShader(bufferBuilder.end());
 	}
 	
+	public static void blitGUI(GuiGraphics graphics, ResourceLocation tex, float x1, float y1, float x2, float y2) {
+		blitGUI(graphics, tex, x1, y1, x2, y2, 0, 0, 1, 1);
+	}
+	
+	public static void blitGUI(GuiGraphics graphics, ResourceLocation tex, float x1, float y1, float x2, float y2, float u1, float v1, float u2, float v2) {
+		RenderSystem.setShaderTexture(0, tex);
+		RenderSystem.setShader(GameRenderer::getPositionTexShader);
+		Matrix4f matrix4f = graphics.pose().last().pose();
+		BufferBuilder bufferBuilder = Tesselator.getInstance().getBuilder();
+		bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+		bufferBuilder.vertex(matrix4f, x1, y1, 0).uv(u1, v1).endVertex();
+		bufferBuilder.vertex(matrix4f, x1, y2, 0).uv(u1, v2).endVertex();
+		bufferBuilder.vertex(matrix4f, x2, y2, 0).uv(u2, v2).endVertex();
+		bufferBuilder.vertex(matrix4f, x2, y1, 0).uv(u2, v1).endVertex();
+		BufferUploader.drawWithShader(bufferBuilder.end());
+	}
+	
 	public static Matrix4f cameraTransform(Camera camera) {
 		PoseStack matrixStack = new PoseStack();
 //		matrixStack.mulPose(Axis.XP.rotationDegrees(camera.getXRot()));
