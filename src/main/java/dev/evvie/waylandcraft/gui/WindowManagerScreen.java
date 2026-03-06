@@ -39,6 +39,7 @@ public class WindowManagerScreen extends Screen {
 	private Button resizeButton;
 	private Button hideButton;
 	private Button pinButton;
+	private Button itemButton;
 	
 	private boolean resizeMode = false;
 	private WLCToplevel resizeToplevel = null;
@@ -127,10 +128,20 @@ public class WindowManagerScreen extends Screen {
 		pinButton.setTooltipDelay(Duration.ofMillis(700));
 		buttons.add(pinButton);
 		
+		itemButton = SpriteIconButton.builder(Component.literal("Give Window Item"), this::onItemPressed, true)
+				.sprite(new ResourceLocation("waylandcraft", "window"), 16, 16)
+				.size(22, 22)
+				.build();
+		itemButton.setPosition(3, topMargin + 60);
+		itemButton.setTooltip(Tooltip.create(Component.literal("Give Window Item")));
+		itemButton.setTooltipDelay(Duration.ofMillis(700));
+		buttons.add(itemButton);
+		
 		addRenderableWidget(grabButton);
 		addRenderableWidget(resizeButton);
 		addRenderableWidget(hideButton);
 		addRenderableWidget(pinButton);
+		addRenderableWidget(itemButton);
 	}
 	
 	private void onGrabPressed(Button button) {
@@ -164,6 +175,13 @@ public class WindowManagerScreen extends Screen {
 		
 		if(wlc.pinnedToplevel != focused) wlc.pinnedToplevel = focused;
 		else wlc.pinnedToplevel = null;
+	}
+	
+	private void onItemPressed(Button button) {
+		if(focused == null) return;
+		
+		// Adding a toplevel to this list has the effect of it being given to the player next tick
+		wlc.newToplevels.add(focused);
 	}
 	
 	private void exitResizeMode() {
@@ -264,12 +282,14 @@ public class WindowManagerScreen extends Screen {
 			resizeButton.active = true;
 			hideButton.active = wlc.hasDisplayFor(focused);
 			pinButton.active = true;
+			itemButton.active = true;
 		}
 		else {
 			grabButton.active = false;
 			resizeButton.active = false;
 			hideButton.active = false;
 			pinButton.active = false;
+			itemButton.active = false;
 		}
 		
 		buttons.forEach((b) -> b.visible = true);

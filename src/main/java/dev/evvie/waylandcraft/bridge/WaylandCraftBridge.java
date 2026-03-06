@@ -26,7 +26,7 @@ public class WaylandCraftBridge {
 	
 	private LinkedList<WLCToplevel> focusOrder = new LinkedList<WLCToplevel>();
 	
-	public ArrayList<WLCToplevel> newToplevels = new ArrayList<WLCToplevel>();
+	private ArrayList<WLCToplevel> newToplevels = new ArrayList<WLCToplevel>();
 	
 	static {
 		System.loadLibrary("waylandcraft");
@@ -61,6 +61,13 @@ public class WaylandCraftBridge {
 		
 		toplevels.add(toplevel);
 		return toplevel;
+	}
+	
+	public WLCToplevel[] getNewToplevels() {
+		WLCToplevel[] toplevels = newToplevels.toArray(WLCToplevel[]::new);
+		newToplevels.clear();
+		
+		return toplevels;
 	}
 	
 	protected WLCPopup getOrCreatePopup(long handle) {

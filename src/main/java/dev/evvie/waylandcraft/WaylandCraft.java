@@ -2,6 +2,8 @@ package dev.evvie.waylandcraft;
 
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -64,6 +66,8 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 	public WindowDisplay grabbedDisplay = null;
 	
 	public WLCToplevel pinnedToplevel = null;
+	
+	public List<WLCToplevel> newToplevels = new ArrayList<WLCToplevel>();
 	
 	public XDGDesktopManager xdgManager = new XDGDesktopManager();
 	
@@ -165,6 +169,8 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 				
 				toplevel.requests.fullscreen = toplevel.requests.unfullscreen = false;
 			}
+			
+			newToplevels.addAll(Arrays.asList(bridge.getNewToplevels()));
 			
 			if(grabbedDisplay != null && !grabbedDisplay.isValid()) grabbedDisplay = null;
 			if(grabbedDisplay != null) anchorToCamera(grabbedDisplay, context.camera());
@@ -279,7 +285,7 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 			if(bridge == null) return;
 			
 			level.players().forEach(player -> {
-				bridge.newToplevels.forEach(toplevel -> {
+				newToplevels.forEach(toplevel -> {
 					ItemStack item = WindowItem.createItem(toplevel);
 					player.addItem(item);
 				});
@@ -294,7 +300,7 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 					inv.setItem(i, ItemStack.EMPTY);
 				}
 			});
-			bridge.newToplevels.clear();
+			newToplevels.clear();
 			
 			StreamSupport.stream(level.getAllEntities().spliterator(), false)
 					.filter((e) -> e instanceof ItemEntity)
