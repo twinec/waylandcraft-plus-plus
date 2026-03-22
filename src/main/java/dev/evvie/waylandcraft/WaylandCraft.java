@@ -161,10 +161,10 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 		updateOutputSize(inWMScreen);
 	}
 	
-	public void enableKeyboardCapture() {
+	public void enableKeyboardCapture(boolean hardCapture) {
 		if(keyboardCaptureMode != KeyboardCaptureMode.NONE) return;
 		
-		keyboardCaptureMode = KeyboardCaptureMode.CAPTURE;
+		keyboardCaptureMode = hardCapture ? KeyboardCaptureMode.HARD_CAPTURE : KeyboardCaptureMode.CAPTURE;
 		bridge.activateKeyboard();
 	}
 	
@@ -184,7 +184,7 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 		}
 		
 		if(keyCaptureKeyboard.consumeClick()) {
-			enableKeyboardCapture();
+			enableKeyboardCapture(false);
 			return;
 		}
 	}
@@ -416,9 +416,21 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 	 * For X11 and Wayland hosts, this is a huge hack but should mostly work for now
 	 */
 	public boolean onKeyPress(long windowHandle, int key, int scancode, int action, int modifiers) {
+		if(key == GLFW.GLFW_KEY_ESCAPE && modifiers == GLFW.GLFW_MOD_SUPER) {
+			if(action == 0) return true;
+			
+			if(keyboardCaptureMode != KeyboardCaptureMode.HARD_CAPTURE) {
+				enableKeyboardCapture(true);
+			}
+			else {
+				disableKeyboardCapture();
+			}
+			return true;
+		}
+		
 		if(keyboardCaptureMode == KeyboardCaptureMode.NONE) return false;
 		
-		if(key == GLFW.GLFW_KEY_ESCAPE) {
+		if(keyboardCaptureMode == KeyboardCaptureMode.CAPTURE && key == GLFW.GLFW_KEY_ESCAPE) {
 			disableKeyboardCapture();
 			return true;
 		}
@@ -454,7 +466,7 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 	
 	public static enum KeyboardCaptureMode {
 		
-		NONE, CAPTURE;
+		NONE, CAPTURE, HARD_CAPTURE;
 		
 	}
 	
