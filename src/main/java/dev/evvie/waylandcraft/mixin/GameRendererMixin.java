@@ -25,6 +25,7 @@ public class GameRendererMixin {
 		HitResult result = pick(cameraEntity, blockInteractRange, entityInteractRange, partialTicks);
 		Vec3 pos = cameraEntity.getEyePosition(partialTicks);
 		
+		WaylandCraft.instance.trueGameHitResult = result;
 		if(WaylandCraft.instance.overridePickBlock) return BlockHitResult.miss(pos, Direction.DOWN, BlockPos.containing(pos));
 		
 		return result;

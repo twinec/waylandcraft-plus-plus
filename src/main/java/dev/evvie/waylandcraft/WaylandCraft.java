@@ -59,6 +59,7 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 	public ArrayList<WindowDisplay> displays = new ArrayList<WindowDisplay>();
 	
 	public boolean overridePickBlock = false;
+	public HitResult trueGameHitResult = null;
 	
 	public WLCToplevel pinnedToplevel = null;
 	
@@ -330,18 +331,24 @@ public class WaylandCraft implements ModInitializer, ClientModInitializer {
 		Vec3 look = new Vec3(camera.getLookVector());
 		Vec3 up = new Vec3(camera.getUpVector());
 		
-		HitResult gameHitResult = Minecraft.getInstance().hitResult;
-		
 		DisplayHitResult finalHitResult = null;
+		double finalDistance = Double.POSITIVE_INFINITY;
 		for(WindowDisplay display : displays) {
 			DisplayHitResult hit = display.intersect(pos, look);
 			if(hit == null || hit.isMiss()) continue;
 			
-			boolean closer = gameHitResult == null || gameHitResult.getType() == HitResult.Type.MISS || hit.position.distanceToSqr(pos) < gameHitResult.getLocation().distanceToSqr(pos);
-			if(finalHitResult == null || closer) {
+			double dist = hit.position.distanceToSqr(pos);
+			if(finalHitResult == null || dist < finalDistance) {
 				finalHitResult = hit;
+				finalDistance = dist;
 			}
 		}
+		
+		// Check if game hit result closer
+		// Must use trueGameHitResult because the game hit result is overridden by overridePickBlock
+		HitResult gameHitResult = trueGameHitResult;
+		double gameHitDistance = (gameHitResult == null || gameHitResult.getType() == HitResult.Type.MISS) ? Double.POSITIVE_INFINITY : gameHitResult.getLocation().distanceToSqr(pos);
+		if(gameHitDistance < finalDistance) finalHitResult = null;
 		
 		// Check for player reach
 		if(finalHitResult != null && !finalHitResult.position.closerThan(pos, Minecraft.getInstance().player.blockInteractionRange())) finalHitResult = null;
