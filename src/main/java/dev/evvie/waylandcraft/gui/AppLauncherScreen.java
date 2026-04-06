@@ -1,6 +1,8 @@
 package dev.evvie.waylandcraft.gui;
 
+import java.awt.Color;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import dev.evvie.waylandcraft.WaylandCraft;
@@ -15,7 +17,12 @@ public class AppLauncherScreen extends Screen {
 	
 	private WaylandCraft wlc;
 	private AppListWidget list;
+	private CategorySelectorWidget categorySelector;
 	private EditBox searchBox;
+	
+	private Component header;
+	
+	private ArrayList<Category> categories;
 	
 	public AppLauncherScreen(WaylandCraft wlc) {
 		super(Component.literal("App Launcher"));
@@ -27,17 +34,44 @@ public class AppLauncherScreen extends Screen {
 	protected void init() {
 		int listWidth = AppListWidget.ELEMENT_WIDTH;
 		int listHeight = 170;
+		int listX = width / 2 - listWidth / 2;
+		int listY = height / 2 - listHeight / 2;
+		
 		list = new AppListWidget(this::launch, Component.literal("App List"));
-		list.setRectangle(listWidth, listHeight, width / 2 - listWidth / 2, height / 2 - listHeight / 2);
+		list.setRectangle(listWidth, listHeight, listX, listY);
 		this.addRenderableWidget(this.list);
 		
 		// Search box is not added to widgets for custom focus / key enter rules
-		searchBox = new EditBox(font, width / 2 - listWidth / 2, list.getY() - 25, listWidth, 20, Component.literal("Search"));
+		searchBox = new EditBox(font, listX, listY - 25, listWidth, 20, Component.literal("Search"));
 		searchBox.setResponder(this::filterSetEntries);
 		searchBox.setFocused(true); // Eternally focused
 		
-		List<DesktopEntry> entries = wlc.xdgManager.entries().stream().filter((e) -> e.visible).toList();
+		createCategories();
+		
+		int categoryButtonSize = 19;
+		int catSelW = categoryButtonSize * 2;
+		List<CategorySelectorWidget.Entry> categoryEntries = categories.stream().map((category) -> new CategorySelectorWidget.Entry(category.title, category.icon)).toList();
+		categorySelector = new CategorySelectorWidget(Component.literal("Categories"), this::filterSetCategory, categoryEntries);
+		categorySelector.setElementSize(categoryButtonSize);
+		categorySelector.setRectangle(catSelW, listHeight + 25, listX - catSelW - 10, listY - 25);
+		this.addRenderableWidget(categorySelector);
+		
+		filterSetEntries("");
+	}
+	
+	private void filterSetCategory(int idx) {
+		if(idx < 0) {
+			searchBox.setValue("");
+			return;
+		}
+		searchBox.setValue(""); // has to up here, because otherwise it overrides the entries
+		
+		Category category = categories.get(idx);
+		List<DesktopEntry> entries = wlc.xdgManager.entries().stream()
+				.filter((e) -> e.visible && Arrays.stream(e.categories).anyMatch((c) -> c.equals(category.name)))
+				.toList();
 		list.setEntries(entries);
+		header = category.title;
 	}
 	
 	private int similarityScore(String hay, String needle) {
@@ -71,6 +105,7 @@ public class AppLauncherScreen extends Screen {
 	}
 	
 	private void filterSetEntries(String filter) {
+		categorySelector.unselect();
 		List<DesktopEntry> entries = wlc.xdgManager.entries().stream()
 				.map((entry) -> new RankedDesktopEntry(entry, entryMatchesStrScore(entry, filter)))
 				.filter((r) -> r.score > 0)
@@ -78,6 +113,7 @@ public class AppLauncherScreen extends Screen {
 				.map((r) -> r.entry)
 				.toList();
 		list.setEntries(entries);
+		header = Component.literal("Search");
 	}
 	
 	@Override
@@ -98,9 +134,11 @@ public class AppLauncherScreen extends Screen {
 	}
 	
 	@Override
-	public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
-		super.render(guiGraphics, mouseX, mouseY, partialTicks);
-		searchBox.render(guiGraphics, mouseX, mouseY, partialTicks);
+	public void render(GuiGraphics context, int mouseX, int mouseY, float partialTicks) {
+		super.render(context, mouseX, mouseY, partialTicks);
+		searchBox.render(context, mouseX, mouseY, partialTicks);
+		
+		context.drawString(font, header, width / 2 - font.width(header) / 2, 10, Color.white.getRGB());
 	}
 	
 	public void launch(DesktopEntry entry) {
@@ -108,6 +146,25 @@ public class AppLauncherScreen extends Screen {
 		this.onClose();
 	}
 	
+	private void createCategories() {
+		this.categories = new ArrayList<Category>();
+		categories.add(new Category("AudioVideo", Component.literal("Multimedia"), new ResourceLocation(WaylandCraft.MOD_ID, "categories/multimedia"), new ArrayList<DesktopEntry>()));
+		categories.add(new Category("Audio", Component.literal("Audio"), new ResourceLocation(WaylandCraft.MOD_ID, "categories/music"), new ArrayList<DesktopEntry>()));
+		categories.add(new Category("Video", Component.literal("Video"), new ResourceLocation(WaylandCraft.MOD_ID, "categories/video"), new ArrayList<DesktopEntry>()));
+		categories.add(new Category("Development", Component.literal("Development"), new ResourceLocation(WaylandCraft.MOD_ID, "categories/development"), new ArrayList<DesktopEntry>()));
+		categories.add(new Category("Education", Component.literal("Education"), new ResourceLocation(WaylandCraft.MOD_ID, "categories/education"), new ArrayList<DesktopEntry>()));
+		categories.add(new Category("HealthFitness", Component.literal("Health and Fitness"), new ResourceLocation(WaylandCraft.MOD_ID, "categories/healthfitness"), new ArrayList<DesktopEntry>()));
+		categories.add(new Category("Game", Component.literal("Games"), new ResourceLocation(WaylandCraft.MOD_ID, "categories/game"), new ArrayList<DesktopEntry>()));
+		categories.add(new Category("Graphics", Component.literal("Graphics"), new ResourceLocation(WaylandCraft.MOD_ID, "categories/graphics"), new ArrayList<DesktopEntry>()));
+		categories.add(new Category("Network", Component.literal("Network"), new ResourceLocation(WaylandCraft.MOD_ID, "categories/network"), new ArrayList<DesktopEntry>()));
+		categories.add(new Category("Office", Component.literal("Office"), new ResourceLocation(WaylandCraft.MOD_ID, "categories/office"), new ArrayList<DesktopEntry>()));
+		categories.add(new Category("Science", Component.literal("Science"), new ResourceLocation(WaylandCraft.MOD_ID, "categories/science"), new ArrayList<DesktopEntry>()));
+		categories.add(new Category("Settings", Component.literal("Settings"), new ResourceLocation(WaylandCraft.MOD_ID, "categories/settings"), new ArrayList<DesktopEntry>()));
+		categories.add(new Category("System", Component.literal("System"), new ResourceLocation(WaylandCraft.MOD_ID, "categories/system"), new ArrayList<DesktopEntry>()));
+		categories.add(new Category("Utility", Component.literal("Utility"), new ResourceLocation(WaylandCraft.MOD_ID, "categories/utility"), new ArrayList<DesktopEntry>()));
+	}
+	
 	private static record RankedDesktopEntry(DesktopEntry entry, int score) {}
+	private static record Category(String name, Component title, ResourceLocation icon, ArrayList<DesktopEntry> entries) {}
 	
 }
