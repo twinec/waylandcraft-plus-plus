@@ -4,6 +4,7 @@ use crate::{WaylandCraft, wlc_init};
 use crate::egl::{EGLHelper, EGLDisplay};
 use crate::xdg_spec::RawDesktopEntry;
 use crate::svg::render_svg;
+use crate::utils::get_time;
 use smithay::{
     wayland::{
         shell::xdg::{
@@ -12,7 +13,8 @@ use smithay::{
         },
         compositor::{
             SurfaceAttributes, BufferAssignment, with_states, SurfaceData,
-            with_surface_tree_upward, TraversalAction, SubsurfaceCachedState
+            with_surface_tree_upward, TraversalAction, SubsurfaceCachedState,
+            with_states as with_surface_data
         },
         shm::{self, with_buffer_contents},
         viewporter::{ViewportCachedState, ensure_viewport_valid},
@@ -129,10 +131,22 @@ pub extern "system"
 fn Java_dev_evvie_waylandcraft_bridge_WaylandCraftBridge_sendFrame<'l>(
     _env: JNIEnv<'l>,
     _class: JClass<'l>,
-    ptr: jlong
+    handle: jlong,
 ) {
-    let instance = jptr_to_instance(ptr);
-    instance.send_frame();
+    let surface = jptr_to_wlsurface(handle)
+        .expect("sendFrame wlsurface exists");
+
+    with_surface_data(&surface, |data| {
+        let mut attr_guard = data
+            .cached_state
+            .get::<SurfaceAttributes>();
+        let attr = attr_guard
+            .deref_mut()
+            .current();
+        for c in attr.frame_callbacks.drain(..) {
+            c.done(get_time());
+        }
+    });
 }
 
 // Get or insert an element and return its handle

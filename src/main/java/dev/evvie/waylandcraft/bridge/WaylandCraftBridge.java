@@ -294,7 +294,9 @@ public class WaylandCraftBridge {
 		updateFocusOrder();
 		
 		// Do client frame callbacks
-		sendFrame(instance);
+		for(WLCSurface surface : surfaces) {
+			sendFrame(surface.getHandle());
+		}
 	}
 	
 	private void updateGeometry(WLCAbstractWindow window) {
@@ -547,7 +549,7 @@ public class WaylandCraftBridge {
 	private static native long init(long glfwGetProcAddress, long eglDisplay);
 	private static native void update(long instance);
 	private static native String socket(long instance);
-	private static native void sendFrame(long instance);
+	private static native void sendFrame(long handle);
 	
 	private static native void updateSurfaceData(long instance, WLCSurface surface);
 	

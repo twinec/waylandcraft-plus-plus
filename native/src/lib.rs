@@ -4,9 +4,7 @@ use crate::seat::WLCSeatState;
 use crate::ddm::WLCDataState;
 use crate::xdg_spec::XDGSpecHelper;
 use crate::output::WLCOutput;
-use crate::utils::get_time;
 use std::sync::Arc;
-use std::ops::DerefMut;
 use std::time::Duration;
 use std::ffi::OsString;
 use smithay::{
@@ -32,8 +30,6 @@ use smithay::{
         socket::ListeningSocketSource,
         compositor::{
             CompositorState, CompositorClientState, CompositorHandler,
-            SurfaceAttributes,
-            with_surface_tree_downward, TraversalAction
         },
         buffer::BufferHandler,
         shm::{ShmState, ShmHandler},
@@ -348,53 +344,6 @@ impl<'a> WaylandCraft<'a> {
         let event_loop = &mut self.event_loop;
         event_loop.dispatch(Some(Duration::ZERO), state).unwrap();
         state.display_handle.flush_clients().unwrap();
-    }
-
-    pub fn send_frame(&mut self) {
-        let toplevels = self.state.xdg_state.toplevel_surfaces();
-        for toplevel in toplevels {
-            let toplevel_surface = toplevel.wl_surface();
-
-            with_surface_tree_downward(
-                toplevel_surface,
-                (),
-                |_, _, _| TraversalAction::DoChildren(()),
-                |_, data, _| {
-                    let mut attr_guard = data
-                        .cached_state
-                        .get::<SurfaceAttributes>();
-                    let attr = attr_guard
-                        .deref_mut()
-                        .current();
-                    for c in attr.frame_callbacks.drain(..) {
-                        c.done(get_time());
-                    }
-                },
-                |_, _, _| true,
-            );
-        }
-        let popups = self.state.xdg_state.popup_surfaces();
-        for popup in popups {
-            let popup_surface = popup.wl_surface();
-
-            with_surface_tree_downward(
-                popup_surface,
-                (),
-                |_, _, _| TraversalAction::DoChildren(()),
-                |_, data, _| {
-                    let mut attr_guard = data
-                        .cached_state
-                        .get::<SurfaceAttributes>();
-                    let attr = attr_guard
-                        .deref_mut()
-                        .current();
-                    for c in attr.frame_callbacks.drain(..) {
-                        c.done(get_time());
-                    }
-                },
-                |_, _, _| true,
-            );
-        }
     }
 }
 
