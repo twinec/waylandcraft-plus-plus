@@ -289,13 +289,7 @@ impl WLCDataState {
         });
     }
 
-    pub fn dnd_cancel(&mut self) {
-        self.print_dnd_debug("dnd cancel");
-        let dnd = match &self.dnd {
-            Some(d) => d,
-            None => { return }
-        };
-        dnd.source.cancelled();
+    fn unfocus_devices(&self) {
         self.for_all_devices(|device, data| {
             match data.dnd_focus.take() {
                 Some(_) => (),
@@ -303,6 +297,16 @@ impl WLCDataState {
             };
             device.leave();
         });
+    }
+
+    pub fn dnd_cancel(&mut self) {
+        self.print_dnd_debug("dnd cancel");
+        let dnd = match &self.dnd {
+            Some(d) => d,
+            None => { return }
+        };
+        dnd.source.cancelled();
+        self.unfocus_devices();
     }
 
     fn for_all_devices<F>(&self, mut f: F)
@@ -380,17 +384,14 @@ impl Dispatch<WlDataSource, WLCDataSource> for WLCState {
                 });
             },
             wl_data_source::Request::Destroy => {
-                state.data.print_dnd_debug("data source destroy");
                 let dnd = match &state.data.dnd {
                     Some(d) => d,
                     None => { return }
                 };
                 if *source == dnd.source {
-                    if !dnd.dropped {
-                        state.data.dnd_cancel();
-                    } else {
-                        state.data.dnd = None;
-                    }
+                    state.data.print_dnd_debug("data source destroy");
+                    state.data.unfocus_devices();
+                    state.data.dnd = None;
                 }
             },
             wl_data_source::Request::SetActions { dnd_actions } => {
@@ -421,11 +422,15 @@ impl Dispatch<WlDataSource, WLCDataSource> for WLCState {
     fn destroyed(
         state: &mut Self,
         _client: ClientId,
-        resource: &WlDataSource,
+        source: &WlDataSource,
         _data: &WLCDataSource,
     ) {
-        if state.data.clipboard.as_ref().is_some_and(|c| c == resource) {
+        if state.data.clipboard.as_ref().is_some_and(|c| c == source) {
             state.data.clipboard = None;
+        }
+        if let Some(dnd) = &state.data.dnd && *source == dnd.source {
+            state.data.unfocus_devices();
+            state.data.dnd = None;
         }
     }
 }
