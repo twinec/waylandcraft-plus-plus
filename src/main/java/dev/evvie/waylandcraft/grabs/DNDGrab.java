@@ -13,6 +13,7 @@ public class DNDGrab extends PointerGrab {
 	
 	@Override
 	public void init() throws GrabDroppedException {
+		wlc.bridge.sendMotionOutside();
 	}
 	
 	@Override
