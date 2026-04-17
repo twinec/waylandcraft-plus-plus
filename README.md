@@ -5,17 +5,17 @@ Wayland Compositor in Minecraft
 - core
 	- wl_compositor
 	- wl_subcompositor
-	- wl_data_device_manager *(only selection)*
+	- wl_data_device_manager
 	- wl_shm
 	- wl_seat *(pointer, keyboard)*
 	- wl_output
-- xdg-shell (xdg_wm_base)
-- viewporter (wp_viewporter)
-- single-pixel-buffer-v1 (wp_single_pixel_buffer_manager_v1)
-- linux-dmabuf-v1 (zwp_linux_dmabuf_v1)
-- cursor-shape-v1 (wp_cursor_shape_manager_v1) *(only partially)*
-- pointer-constraints-unstable-v1 (zwp_pointer_constraints_v1) *(only locked pointers)*
-- relative-pointer-unstable-v1 (zwp_relative_pointer_manager_v1)
+- xdg-shell
+- viewporter
+- single-pixel-buffer-v1
+- linux-dmabuf-v1
+- cursor-shape-v1 *(partially)*
+- pointer-constraints-unstable-v1 *(only locked pointers)*
+- relative-pointer-unstable-v1
 
 ## System dependencies
 - OS: Linux
@@ -25,7 +25,6 @@ Wayland Compositor in Minecraft
 - xkbcommon tools (xkbcli)
 
 ## Disclaimer
-This is all authentic human-written code and it has several bugs and quirks, as such this compositor
-is not generally meant for everyday use. Use it at your own risk or whatever.
+This compositor still has lots of issues and bugs. Use it at your own risk or whatever.
 
-This project was written entirely for the fun of coding **without the usage of any generative AI** tools.
+The entire project was written **without the usage of any generative AI**.
