@@ -147,7 +147,9 @@ public class AppLauncherScreen extends Screen {
 		super.render(context, mouseX, mouseY, partialTicks);
 		searchBox.render(context, mouseX, mouseY, partialTicks);
 		
-		context.drawString(font, header, width / 2 - font.width(header) / 2, 10, Color.white.getRGB());
+		if(searchBox.getY() >= 5 + font.lineHeight + 5) {
+			context.drawString(font, header, width / 2 - font.width(header) / 2, 5, Color.white.getRGB());
+		}
 	}
 	
 	public void launch(DesktopEntry entry) {
