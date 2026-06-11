@@ -1,8 +1,6 @@
 package dev.evvie.waylandcraft;
 
 import org.jetbrains.annotations.Nullable;
-import org.joml.Matrix3d;
-import org.joml.Vector3d;
 import org.lwjgl.glfw.GLFW;
 
 import com.mojang.blaze3d.platform.InputConstants;
@@ -11,6 +9,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import dev.evvie.waylandcraft.bridge.WLCAbstractWindow;
 import dev.evvie.waylandcraft.bridge.WLCSurface;
 import dev.evvie.waylandcraft.bridge.WLCToplevel;
+import dev.evvie.waylandcraft.math.WorldPlane;
 import dev.evvie.waylandcraft.render.RenderUtils;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import net.minecraft.client.Camera;
@@ -84,11 +83,12 @@ public class WindowDisplay {
 		return pivot.add(localX().scale(-width/2)).add(localY().scale(-height/2));
 	}
 	
+	public WorldPlane getPlane() {
+		return new WorldPlane(origin(), localX(), localY(), normal);
+	}
+	
 	public Vec3 localToWorld(double x, double y, double z) {
-		Vec3 origin = origin();
-		Vec3 localX = localX();
-		Vec3 localY = localY();
-		return origin.add(localX.scale(x)).add(localY.scale(y)).add(normal.scale(z));
+		return getPlane().localToWorld(x, y, z);
 	}
 	
 	public void moveOrigin(Vec3 pos) {
@@ -134,41 +134,19 @@ public class WindowDisplay {
 	 * The resulting vector is the (x, y) pixel location and the z value is the block distance normal to the plane.
 	 */
 	public Vec3 worldToLocal(Vec3 in) {
-		Vec3 origin = origin();
-		Vec3 localX = localX();
-		Vec3 localY = localY();
-		
-		// World coordinates relative to the origin of this window
-		Vec3 world = in.subtract(origin);
-		
-		Matrix3d matrix = new Matrix3d(
-			localX.x, localX.y, localX.z, // Column 0
-			localY.x, localY.y, localY.z, // Column 1
-			normal.x, normal.y, normal.z  // Column 2
-		);
-		matrix.invert();
-		
-		Vector3d result = matrix.transform(new Vector3d(world.x, world.y, world.z));
-		return new Vec3(result.x, result.y, result.z);
+		return getPlane().worldToLocal(in);
 	}
 	
 	/* Perform ray-window plane intersection
 	 * `dir` must be normalized.
 	 */
-	public DisplayHitResult intersect(Vec3 pos, Vec3 dir) {
-		double p1 = pivot.subtract(pos).dot(normal);
-		double p2 = dir.dot(normal);
+	public @Nullable DisplayHitResult intersect(Vec3 pos, Vec3 dir) {
+		WorldPlane.Intersection intersection = getPlane().intersect(pos, dir);
+		if(intersection == null) return null;
 		
-		// Avoid division by zero
-		if(p2 == 0) return null;
-		
-		double t = p1 / p2;
-		
-		// Intersection happens behind the camera
-		if(t < 0) return null;
-		
-		Vec3 hitPos = pos.add(dir.scale(t));
-		Vec3 localCoords = worldToLocal(hitPos);
+		Vec3 hitPos = intersection.world();
+		Vec3 localCoords = intersection.local();
+		double dist = intersection.dist();
 		
 		WLCSurface hitSurface = null;
 		Vec3 localCoordsRelative = null;
@@ -189,10 +167,6 @@ public class WindowDisplay {
 				break;
 			}
 		}
-		
-		// Flip z-coordinate when on the window backside
-		double dist = t;
-		if(p2 > 0) dist *= -1;
 		
 		return new DisplayHitResult(this, hitSurface, hitPos, localCoords, localCoordsRelative, dist);
 	}
