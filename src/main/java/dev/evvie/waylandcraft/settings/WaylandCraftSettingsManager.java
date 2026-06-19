@@ -45,8 +45,6 @@ public class WaylandCraftSettingsManager {
 			throw new IOException("Waylandcraft settings directory exists but is not a directory");
 		}
 		
-		if(wlc.bridge != null) handleKeymap();
-		
 		/* Ensure settings file */
 		boolean createSettings = false;
 		settingsFile = new File(settingsDir, "settings.json");
@@ -70,7 +68,7 @@ public class WaylandCraftSettingsManager {
 		writeSettings();
 	}
 	
-	private void handleKeymap() {
+	public void loadKeymap() {
 		/* Read keymap override */
 		keymapFile = new File(settingsDir, "keymap.txt");
 		

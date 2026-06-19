@@ -151,6 +151,7 @@ public class WaylandCraft implements ClientModInitializer {
 			x11Display = bridge.getX11Display();
 			xdgManager = new XDGDesktopManager(this);
 			registerSettingsResponders();
+			settingsManager.loadKeymap();
 			
 			WaylandCraftCommon.LOGGER.info("Wayland server started on " + waylandSocket);
 			WaylandCraftCommon.LOGGER.info("Xwayland started on " + x11Display);
