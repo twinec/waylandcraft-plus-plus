@@ -80,7 +80,7 @@ public class WindowDisplay {
 		return down.scale(pixelScale());
 	}
 	
-	// World coordinates of the origin of the root surface surface-local coordinate space
+	// World coordinates of the window geometry origin
 	public Vec3 origin() {
 		return pivot.add(localX().scale(-width/2)).add(localY().scale(-height/2));
 	}
@@ -110,15 +110,15 @@ public class WindowDisplay {
 		int yoff = window.framebuffer.getYOff();
 		int bufWidth = window.framebuffer.getWidth();
 		int bufHeight = window.framebuffer.getHeight();
-
+		
 		Vec3 localX = localX();
 		Vec3 localY = localY();
-
+		
 		Vec3 cameraPos = ctx.levelState().cameraRenderState.pos;
 		Vec3 originRel = origin().subtract(cameraPos);
-
-		Vec3 bufOffset = localX.scale(-xoff).add(localY.scale(-yoff));
-
+		
+		Vec3 bufOffset = localX.scale(-xoff - window.geometry.x()).add(localY.scale(-yoff - window.geometry.y()));
+		
 		Vec3 tl = bufOffset;
 		Vec3 bl = bufOffset.add(localY.scale(bufHeight));
 		Vec3 br = bl.add(localX.scale(bufWidth));
@@ -147,7 +147,11 @@ public class WindowDisplay {
 		if(intersection == null) return null;
 		
 		Vec3 hitPos = intersection.world();
-		Vec3 localCoords = intersection.local();
+		Vec3 geometryLocal = intersection.local();
+		
+		// Change from relative to geometry origin (our plane local) to surface-local coords
+		Vec3 localCoords = geometryLocal.add(window.geometry.x(), window.geometry.y(), 0);
+		
 		double dist = intersection.dist();
 		
 		WLCSurface hitSurface = null;
@@ -170,7 +174,7 @@ public class WindowDisplay {
 			}
 		}
 		
-		return new DisplayHitResult(this, hitSurface, hitPos, localCoords, localCoordsRelative, dist);
+		return new DisplayHitResult(this, hitSurface, hitPos, geometryLocal, localCoords, localCoordsRelative, dist);
 	}
 
 	public void adjustAnchorDistance(double delta) {
@@ -256,48 +260,53 @@ public class WindowDisplay {
 		for(WindowDisplay display : WaylandCraft.instance.displays) {
 			if(display == this) continue;
 			if(!(display.window instanceof WLCToplevel)) continue;
-			WLCToplevel toplevel = (WLCToplevel) display.window;
 			
 			DisplayHitResult result = display.intersect(pos, view);
 			if(result == null) continue;
 			
-			double hx = result.surfaceLocalOrigin.x();
-			double hy = result.surfaceLocalOrigin.y();
+			double gx = result.geometryLocal.x();
+			double gy = result.geometryLocal.y();
 			
-			int left = toplevel.geometry.x();
-			int top = toplevel.geometry.y();
-			int right = left + toplevel.geometry.width();
-			int bottom = top + toplevel.geometry.height();
+			double w = display.width;
+			double h = display.height;
 			
-			int myLeft = window.geometry.x();
-			int myTop = window.geometry.y();
-			int myRight = myLeft + window.geometry.width();
-			int myBottom = myTop + window.geometry.height();
+			double cx = gx - w / 2;
+			double cy = gy - h / 2;
 			
-			double snapDistance = 0.2 * WaylandCraft.instance.settings.getPixelsPerBlock();
+			final double snapDistInner = Math.min(w / 2, h / 2) * 0.75;
+			final double snapDistOuter = 300;
+			final double snapDistInnerCorner = 100;
+			final double margin = 30;
 			
-			// Right side snap
-			if(hy >= top && hy <= bottom && hx >= right - snapDistance && hx <= right + snapDistance) {
-				this.rotate(display.normal(), display.down());
-				this.pivot = display.localToWorld(right + (myRight - myLeft) / 2 - myLeft, (bottom - top) / 2, 0);
+			double dx = Math.abs(cx) - w / 2;
+			double dy = Math.abs(cy) - h / 2;
+			
+			boolean snapXCorner = dx > -snapDistInnerCorner && dx < snapDistOuter;
+			boolean snapYCorner = dy > -snapDistInnerCorner && dy < snapDistOuter;
+			
+			// Corner snapping
+			if(snapXCorner && snapYCorner) {
+				rotate(display.normal(), display.down());
+				Vec3 wx = display.localX().scale(cx < 0 ? -width - margin : w + margin);
+				Vec3 wy = display.localY().scale(cy < 0 ? -height - margin : h + margin);
+				moveOrigin(display.origin().add(wx).add(wy));
 				return;
 			}
-			// Left side snap
-			else if(hy >= top && hy <= bottom && hx <= left + snapDistance && hx >= left - snapDistance) {
-				this.rotate(display.normal(), display.down());
-				this.pivot = display.localToWorld(left - (myRight - myLeft) / 2 - myLeft, (bottom - top) / 2, 0);
+			
+			boolean snapX = dx < snapDistOuter && dx > -snapDistInner;
+			boolean snapY = dy < snapDistOuter && dy > -snapDistInner;
+			
+			// Top / bottom edge snapping
+			if(snapY && gx >= 0 && gx <= w) {
+				rotate(display.normal(), display.down());
+				pivot = display.pivot.add(display.localY().scale(Math.signum(cy) * (height / 2 + h / 2 + margin)));
 				return;
 			}
-			// Top side snap
-			else if(hx >= left && hx <= right && hy >= top - snapDistance && hy <= top + snapDistance) {
-				this.rotate(display.normal(), display.down());
-				this.pivot = display.localToWorld((right - left) / 2, top - (myBottom - myTop) / 2 - myTop, 0);
-				return;
-			}
-			// Bottom side snap
-			else if(hx >= left && hx <= right && hy <= bottom + snapDistance && hy >= bottom - snapDistance) {
-				this.rotate(display.normal(), display.down());
-				this.pivot = display.localToWorld((right - left) / 2, bottom + (myBottom - myTop) / 2 - myTop, 0);
+			
+			// Left / right edge snapping
+			if(snapX && gy >= 0 && gy <= h) {
+				rotate(display.normal(), display.down());
+				pivot = display.pivot.add(display.localX().scale(Math.signum(cx) * (width / 2 + w / 2 + margin)));
 				return;
 			}
 		}
@@ -314,7 +323,10 @@ public class WindowDisplay {
 		// World position
 		public final Vec3 position;
 		
-		// Surface-local coordinates relative to WindowDisplay origin
+		// Coordinates relative to window geometry origin
+		public final Vec3 geometryLocal;
+		
+		// Root surface surface-local coordinates
 		public final Vec3 surfaceLocalOrigin;
 		
 		// Surface-local coordinates relative to hit surface. Always guaranteed to not be null, if `surface` is non-null.
@@ -323,10 +335,11 @@ public class WindowDisplay {
 		// Calculated distance
 		public final double dist;
 		
-		public DisplayHitResult(WindowDisplay target, WLCSurface surface, Vec3 position, Vec3 surfaceLocalOrigin, Vec3 surfaceLocalRelative, double dist) {
+		public DisplayHitResult(WindowDisplay target, WLCSurface surface, Vec3 position, Vec3 geometryLocal, Vec3 surfaceLocalOrigin, Vec3 surfaceLocalRelative, double dist) {
 			this.target = target;
 			this.surface = surface;
 			this.position = position;
+			this.geometryLocal = geometryLocal;
 			this.surfaceLocalOrigin = surfaceLocalOrigin;
 			this.surfaceLocalRelative = surfaceLocalRelative;
 			this.dist = dist;

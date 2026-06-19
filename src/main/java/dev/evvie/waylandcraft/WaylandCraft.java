@@ -695,11 +695,7 @@ public class WaylandCraft implements ClientModInitializer {
 		}
 		
 		window.rotate(parent.normal(), parent.down());
-		
-		int x = popup.offsetX - popup.geometry.x() + parent.window.geometry.x();
-		int y = popup.offsetY - popup.geometry.y() + parent.window.geometry.y();
-		
-		window.moveOrigin(parent.localToWorld(x, y, 0.01));
+		window.moveOrigin(parent.localToWorld(popup.offsetX, popup.offsetY, 0.01));
 	}
 	
 	public static enum KeyboardCaptureMode {
