@@ -129,7 +129,7 @@ public class RenderUtils {
 		}
 	);
 	
-	public static void renderFramebuffer(WindowFramebuffer framebuffer, PoseStack poseStack, SubmitNodeCollector collector, boolean cutout, Vec3 tl, Vec3 bl, Vec3 br, Vec3 tr) {
+	public static void renderFramebuffer(WindowFramebuffer framebuffer, PoseStack poseStack, SubmitNodeCollector collector, boolean cutout, Vec3 origin, Vec3 spanX, Vec3 spanY) {
 		if(!framebuffer.isValid()) return;
 		
 		Function<Identifier, RenderType> renderType;
@@ -137,17 +137,22 @@ public class RenderUtils {
 		// Front quad
 		if(WaylandCraft.instance.settings.getAntialiasing()) renderType = cutout ? WINDOW_CUTOUT_ANTIALIAS : WINDOW_TRANSLUCENT_ANTIALIAS;
 		else renderType = cutout ? WINDOW_CUTOUT : WINDOW_TRANSLUCENT;
-		collector.submitCustomGeometry(poseStack, renderType.apply(framebuffer.getTextureLocation()), new FramebufferRenderInstance(tl, bl, br, tr, false));
+		collector.submitCustomGeometry(poseStack, renderType.apply(framebuffer.getTextureLocation()), new FramebufferRenderInstance(origin, spanX, spanY, false));
 		
 		// Back quad
 		renderType = cutout ? WINDOW_BACKGROUND_CUTOUT : WINDOW_BACKGROUND_TRANSLUCENT;
-		collector.submitCustomGeometry(poseStack, renderType.apply(framebuffer.getTextureLocation()), new FramebufferRenderInstance(tl, bl, br, tr, true));
+		collector.submitCustomGeometry(poseStack, renderType.apply(framebuffer.getTextureLocation()), new FramebufferRenderInstance(origin, spanX, spanY, true));
 	}
 	
-	public static final record FramebufferRenderInstance(Vec3 tl, Vec3 bl, Vec3 br, Vec3 tr, boolean reverse) implements CustomGeometryRenderer {
+	public static final record FramebufferRenderInstance(Vec3 origin, Vec3 spanX, Vec3 spanY, boolean reverse) implements CustomGeometryRenderer {
 		
 		@Override
 		public void render(Pose pose, VertexConsumer buffer) {
+			Vec3 tl = origin;
+			Vec3 bl = tl.add(spanY);
+			Vec3 br = bl.add(spanX);
+			Vec3 tr = tl.add(spanX);
+			
 			if(!reverse) {
 				buffer.addVertex(pose, tl.toVector3f()).setUv(0.0f, 0.0f);
 				buffer.addVertex(pose, bl.toVector3f()).setUv(0.0f, 1.0f);
