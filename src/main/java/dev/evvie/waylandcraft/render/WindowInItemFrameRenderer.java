@@ -39,12 +39,7 @@ public class WindowInItemFrameRenderer {
 		x += resolution / 2 - width / 2;
 		y += resolution / 2 - height / 2;
 		
-		Vec3 tl = new Vec3(x, y, 0);
-		Vec3 bl = new Vec3(x, y + h, 0);
-		Vec3 br = new Vec3(x + w, y + h, 0);
-		Vec3 tr = new Vec3(x + w, y, 0);
-		
-		RenderUtils.renderFramebuffer(toplevel.framebuffer, poseStack, collector, true, tl, bl, br, tr);
+		RenderUtils.renderFramebuffer(toplevel.framebuffer, poseStack, collector, true, new Vec3(x, y, 0), new Vec3(w, 0, 0), new Vec3(0, h, 0));
 		
 		poseStack.popPose();
 	}

@@ -29,8 +29,6 @@ void main() {
 		discard;
 	}
 
-	color.rgb = color.rgb / color.a; // Undo framebuffer alpha premultiplication
-
 #ifdef ALPHA_CUTOUT
 	color.a = 1.0;
 #endif

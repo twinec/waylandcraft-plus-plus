@@ -119,15 +119,10 @@ public class WindowDisplay {
 		
 		Vec3 bufOffset = localX.scale(-xoff - window.geometry.x()).add(localY.scale(-yoff - window.geometry.y()));
 		
-		Vec3 tl = bufOffset;
-		Vec3 bl = bufOffset.add(localY.scale(bufHeight));
-		Vec3 br = bl.add(localX.scale(bufWidth));
-		Vec3 tr = tl.add(localX.scale(bufWidth));
-		
 		PoseStack poseStack = ctx.poseStack();
 		poseStack.pushPose();
 		poseStack.translate(originRel.x, originRel.y, originRel.z);
-		RenderUtils.renderFramebuffer(window.framebuffer, poseStack, ctx.submitNodeCollector(), true, tl, bl, br, tr);
+		RenderUtils.renderFramebuffer(window.framebuffer, poseStack, ctx.submitNodeCollector(), true, bufOffset, localX.scale(bufWidth), localY.scale(bufHeight));
 		poseStack.popPose();
 	}
 	

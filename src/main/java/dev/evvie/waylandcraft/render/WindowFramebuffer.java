@@ -57,6 +57,17 @@ public class WindowFramebuffer {
 		.build()
 	);
 	
+	public static final RenderPipeline UNPREMULTIPLY_PIPELINE = RenderPipelines.register(
+		RenderPipeline.builder()
+		.withLocation(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "pipeline/unpremultiply"))
+		.withVertexShader("core/screenquad")
+		.withFragmentShader(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "unpremultiply"))
+		.withVertexFormat(DefaultVertexFormat.EMPTY, VertexFormat.Mode.TRIANGLES)
+		.withColorTargetState(ColorTargetState.DEFAULT)
+		.withSampler("sampler")
+		.build()
+	);
+	
 	public static final RenderPipeline DAMAGE_PIPELINE = RenderPipelines.register(
 		RenderPipeline.builder()
 		.withLocation(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "pipeline/damage"))
@@ -173,6 +184,12 @@ public class WindowFramebuffer {
 			for(CompiledBufferDraw element : elements) {
 				element.vertexBuffer.close();
 			}
+		}
+		
+		try(RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "window framebuffer unpremultiply", target.getColorTextureView(), OptionalInt.empty())) {
+			pass.setPipeline(UNPREMULTIPLY_PIPELINE);
+			pass.bindTexture("sampler", target.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+			pass.draw(0, 3);
 		}
 		
 		if(debugDamage) drawDebugDamage(opaqueUniforms);
@@ -311,6 +328,7 @@ public class WindowFramebuffer {
 		public FramebufferTexture(GpuTextureView textureView) {
 			this.textureView = textureView;
 			this.texture = textureView.texture();
+			this.sampler = RenderUtils.WINDOW_SAMPLER.get();
 		}
 		
 		@Override

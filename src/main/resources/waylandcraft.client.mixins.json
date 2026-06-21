@@ -15,7 +15,6 @@
 		"ItemFrameRendererMixin",
 		"ItemFrameRenderStateMixin",
 		"IGlTextureMixin",
-		"IGuiGraphicsExtractor",
 		"FramerateLimitTrackerMixin",
 		"TitleScreenMixin",
 		"PauseScreenMixin"

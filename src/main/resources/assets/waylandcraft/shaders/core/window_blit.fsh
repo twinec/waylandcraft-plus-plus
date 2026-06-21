@@ -11,7 +11,6 @@ out vec4 fragColor;
 
 void main() {
 	vec4 color = texture(Sampler0, texCoord0);
-	color = vec4(color.rgb / color.a, color.a); // Undo framebuffer alpha premultiplication
 	color *= vertexColor;
 	fragColor = color * ColorModulator;
 }
