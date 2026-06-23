@@ -13,6 +13,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 
 import dev.evvie.waylandcraft.WindowDisplay.DisplayHitResult;
 import dev.evvie.waylandcraft.bridge.WLCAbstractWindow;
+import dev.evvie.waylandcraft.compat.VulkanModCompat;
 import dev.evvie.waylandcraft.bridge.WLCAbstractWindow.SurfaceGeometry;
 import dev.evvie.waylandcraft.bridge.WLCPopup;
 import dev.evvie.waylandcraft.bridge.WLCSurface;
@@ -123,6 +124,12 @@ public class WaylandCraft implements ClientModInitializer {
 		
 		if(Platform.get() != Platform.LINUX) {
 			WaylandCraftCommon.LOGGER.error("Invalid platform detected! Most mod features will be disabled");
+			WaylandCraft.fallbackMode = true;
+			return;
+		}
+
+		if(VulkanModCompat.isLoaded()) {
+			WaylandCraftCommon.LOGGER.error("VulkanMod detected! WaylandCraft's OpenGL/EGL rendering pipeline is incompatible with VulkanMod. Most mod features will be disabled.");
 			WaylandCraft.fallbackMode = true;
 			return;
 		}
