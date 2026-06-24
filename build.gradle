@@ -54,9 +54,17 @@ dependencies {
 	// artifact includes polymer-core, polymer-rsm, and polymer-resource-pack.
 	compileOnly "eu.pb4:polymer-bundled:${project.polymer_version}"
 
-	// VulkanMod and Beryl — detected at runtime via FabricLoader.isModLoaded()
-	// only; no VulkanMod or Beryl API is called, so no compile-time dep is
-	// needed. See VulkanModCompat and BerylCompat.
+	// Beryl — detected at runtime via FabricLoader.isModLoaded() only;
+	// no Beryl API is called, so no compile-time dep is needed. See BerylCompat.
+
+	// VulkanMod (optional at runtime, compile-time only here) ──────────────────
+	// dev.evvie.waylandcraft.vulkanmod.* references net.vulkanmod.* directly.
+	// The package is only ever entered behind a WaylandCraftVulkanSupport.ACTIVE
+	// guard, so the mod works fine without VulkanMod installed.
+	compileOnly "maven.modrinth:vulkanmod:${project.vulkanmod_version}"
+	// lwjgl-vulkan is bundled by VulkanMod; we declare it separately so
+	// VkDevice / VkCommandBuffer etc. resolve at compile time.
+	compileOnly "org.lwjgl:lwjgl-vulkan:3.4.1"
 }
 
 processResources {

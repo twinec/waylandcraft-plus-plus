@@ -13,7 +13,6 @@ import com.mojang.blaze3d.platform.InputConstants;
 
 import dev.evvie.waylandcraft.WindowDisplay.DisplayHitResult;
 import dev.evvie.waylandcraft.bridge.WLCAbstractWindow;
-import dev.evvie.waylandcraft.compat.VulkanModCompat;
 import dev.evvie.waylandcraft.bridge.WLCAbstractWindow.SurfaceGeometry;
 import dev.evvie.waylandcraft.bridge.WLCPopup;
 import dev.evvie.waylandcraft.bridge.WLCSurface;
@@ -127,12 +126,6 @@ public class WaylandCraft implements ClientModInitializer {
 			WaylandCraft.fallbackMode = true;
 			return;
 		}
-
-		if(VulkanModCompat.isLoaded()) {
-			WaylandCraftCommon.LOGGER.error("VulkanMod detected! WaylandCraft's OpenGL/EGL rendering pipeline is incompatible with VulkanMod. Most mod features will be disabled.");
-			WaylandCraft.fallbackMode = true;
-			return;
-		}
 		
 		LevelRenderEvents.COLLECT_SUBMITS.register(this::renderWorld);
 		LevelRenderEvents.END_EXTRACTION.register(this::updateWorld);
@@ -142,9 +135,9 @@ public class WaylandCraft implements ClientModInitializer {
 		ClientTickEvents.START_CLIENT_TICK.register(itemManager);
 		
 		WaylandCraftCommon.instance.windowItemInteractionProvider = itemManager;
-
+		
 		dev.evvie.waylandcraft.network.WaylandCraftNetworking.registerClient();
-
+		
 		hudRenderer.register();
 	}
 	
@@ -160,7 +153,6 @@ public class WaylandCraft implements ClientModInitializer {
 			x11Display = bridge.getX11Display();
 			xdgManager = new XDGDesktopManager(this);
 			registerSettingsResponders();
-			settingsManager.loadKeymap();
 			
 			WaylandCraftCommon.LOGGER.info("Wayland server started on " + waylandSocket);
 			WaylandCraftCommon.LOGGER.info("Xwayland started on " + x11Display);
@@ -704,7 +696,11 @@ public class WaylandCraft implements ClientModInitializer {
 		}
 		
 		window.rotate(parent.normal(), parent.down());
-		window.moveOrigin(parent.localToWorld(popup.offsetX, popup.offsetY, 0.01));
+		
+		int x = popup.offsetX - popup.geometry.x() + parent.window.geometry.x();
+		int y = popup.offsetY - popup.geometry.y() + parent.window.geometry.y();
+		
+		window.moveOrigin(parent.localToWorld(x, y, 0.01));
 	}
 	
 	public static enum KeyboardCaptureMode {

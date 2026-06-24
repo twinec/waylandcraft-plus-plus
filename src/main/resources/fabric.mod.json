@@ -23,6 +23,10 @@
 		{
 			"config": "waylandcraft.client.mixins.json",
 			"environment": "client"
+		},
+		{
+			"config": "waylandcraft.vulkanmod.mixins.json",
+			"environment": "client"
 		}
 	],
 	"depends": {
