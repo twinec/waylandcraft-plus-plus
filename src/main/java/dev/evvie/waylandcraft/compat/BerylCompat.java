@@ -5,22 +5,19 @@ import net.fabricmc.loader.api.FabricLoader;
 public class BerylCompat {
 
 	/**
-	 * Returns true when Beryl is loaded and its rendering effects are active.
-	 * When active, WaylandCraft falls back to entity-based rendering so that
-	 * Beryl's pipeline does not corrupt the window framebuffers.
+	 * Returns true when Beryl is loaded. When active, WaylandCraft falls back
+	 * to entity-based rendering so that Beryl's pipeline does not corrupt the
+	 * window framebuffers — the same path used for Iris shader packs.
+	 *
+	 * Beryl does not currently expose a public Java API to query whether its
+	 * effects are actually enabled at a given moment (unlike Iris, which has
+	 * IrisApi.isShaderPackInUse()). Presence of the mod is used as a proxy:
+	 * if Beryl is installed it is assumed to be active. If Beryl ships a
+	 * stable API in a future release, this method can be tightened to call it
+	 * via an inner holder class (see IrisCompat for the pattern).
 	 */
 	public static boolean isShaderActive() {
-		if (!FabricLoader.getInstance().isModLoaded("beryl")) return false;
-		return BerylApiHolder.isActive();
-	}
-
-	/**
-	 * Separate class so the Beryl API is only classloaded when Beryl is present.
-	 */
-	private static class BerylApiHolder {
-		static boolean isActive() {
-			return gg.galaxygaming.beryl.api.BerylApi.getInstance().isActive();
-		}
+		return FabricLoader.getInstance().isModLoaded("beryl");
 	}
 
 }
