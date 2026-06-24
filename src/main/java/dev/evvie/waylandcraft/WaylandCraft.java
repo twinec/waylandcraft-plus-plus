@@ -142,7 +142,9 @@ public class WaylandCraft implements ClientModInitializer {
 		ClientTickEvents.START_CLIENT_TICK.register(itemManager);
 		
 		WaylandCraftCommon.instance.windowItemInteractionProvider = itemManager;
-		
+
+		dev.evvie.waylandcraft.network.WaylandCraftNetworking.registerClient();
+
 		hudRenderer.register();
 	}
 	

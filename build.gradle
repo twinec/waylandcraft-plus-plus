@@ -40,7 +40,20 @@ dependencies {
 	compileOnly "maven.modrinth:iris:${project.iris_version}"
 	compileOnly "maven.modrinth:beryl:${project.beryl_version}"
 	compileOnly "maven.modrinth:vulkanmod:${project.vulkanmod_version}"
-	compileOnly "maven.modrinth:polymer:${project.polymer_version}"
+
+	// ── Polymer (optional at runtime, compile-time only here) ──────────────
+	// PolymerIntegration and PolymerWindowItem are the only classes that
+	// reference Polymer directly, and both are only ever loaded behind a
+	// FabricLoader.isModLoaded("polymer-core") check (see WindowItem.java's
+	// class doc and PolymerIntegration's). The mod works without Polymer
+	// present at all — just without the "non-WaylandCraft players can join"
+	// benefit. We only need the classes at compile time so those two files
+	// can reference eu.pb4.polymer.* directly.
+	// Drop the real compiled jar into libs/ before building:
+	//   cp /path/to/polymer-bundled-0.16.5+26.1.2.jar libs/
+	// If you want Polymer's actual runtime benefit, the same jar also needs
+	// to be physically present in the dedicated server's mods/ folder.
+	compileOnly(fileTree(dir: "libs", include: "polymer-*.jar"))
 }
 
 processResources {
