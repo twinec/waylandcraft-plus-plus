@@ -3,6 +3,9 @@ package dev.evvie.waylandcraft.mixin;
 import java.util.ArrayList;
 
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import dev.evvie.waylandcraft.utils.IMyServerPlayer;
 import net.minecraft.server.level.ServerPlayer;
@@ -26,6 +29,11 @@ public class ServerPlayerMixin implements IMyServerPlayer {
 	@Override
 	public ArrayList<Long> getAliveWindows() {
 		return aliveWindows;
+	}
+	
+	@Inject(method = "restoreFrom", at = @At("TAIL"))
+	public void myRestoreFrom(ServerPlayer oldPlayer, boolean restoreAll, CallbackInfo info) {
+		aliveWindows = ((IMyServerPlayer) oldPlayer).getAliveWindows();
 	}
 	
 }
