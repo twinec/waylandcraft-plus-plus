@@ -13,7 +13,6 @@ import com.mojang.blaze3d.buffers.Std140SizeCalculator;
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.ColorTargetState;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.platform.DestFactor;
 import com.mojang.blaze3d.platform.SourceFactor;
@@ -84,7 +83,8 @@ public class WindowFramebuffer implements FramebufferRenderable {
 	private static boolean debugDamage = false;
 	
 	public final WLCSurface surfaceTree;
-	private RenderTarget target = null;
+	private TextureTarget tempTarget = null;
+	private TextureTarget target = null;
 	private FramebufferTexture texture = null;
 	private Identifier location = null;
 	
@@ -140,6 +140,10 @@ public class WindowFramebuffer implements FramebufferRenderable {
 		
 		if(width != prevWidth || height != prevHeight) destroy();
 		
+		if(tempTarget == null) {
+			tempTarget = new TextureTarget(name() + "-temp", width, height, false);
+		}
+		
 		if(target == null) {
 			target = new TextureTarget(name(), width, height, false);
 		}
@@ -153,7 +157,7 @@ public class WindowFramebuffer implements FramebufferRenderable {
 	
 	public void render() {
 		updateTarget();
-		if(target == null) return;
+		if(target == null || tempTarget == null) return;
 		
 		PoseStack poseStack = new PoseStack();
 		poseStack.translate(-1.0, -1.0, 0.0);
@@ -170,7 +174,7 @@ public class WindowFramebuffer implements FramebufferRenderable {
 		GpuBufferSlice opaqueUniforms = uniformStorage.writeUniform(new WindowInfoUniform(poseStack.last().pose(), false));
 		
 		try {
-			try(RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "window framebuffer", target.getColorTextureView(), OptionalInt.of(0x00000000))) {
+			try(RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "window framebuffer", tempTarget.getColorTextureView(), OptionalInt.of(0x00000000))) {
 				pass.setPipeline(WINDOW_PIPELINE);
 				for(CompiledBufferDraw element : elements) {
 					pass.setUniform("window_info", element.alpha ? alphaUniforms : opaqueUniforms);
@@ -189,7 +193,7 @@ public class WindowFramebuffer implements FramebufferRenderable {
 		
 		try(RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "window framebuffer unpremultiply", target.getColorTextureView(), OptionalInt.empty())) {
 			pass.setPipeline(UNPREMULTIPLY_PIPELINE);
-			pass.bindTexture("sampler", target.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+			pass.bindTexture("sampler", tempTarget.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
 			pass.draw(0, 3);
 		}
 		
@@ -291,8 +295,10 @@ public class WindowFramebuffer implements FramebufferRenderable {
 	
 	public void destroy() {
 		if(target != null) target.destroyBuffers();
+		if(tempTarget != null) tempTarget.destroyBuffers();
 		if(texture != null) unregisterTexture();
 		target = null;
+		tempTarget = null;
 	}
 	
 	@Override
