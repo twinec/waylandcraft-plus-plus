@@ -41,3 +41,4 @@ replay_*.log
 
 # directory used by actions runner
 native-libs
+libs/*.jar
