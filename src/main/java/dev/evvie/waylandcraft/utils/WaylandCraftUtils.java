@@ -1,9 +1,15 @@
 package dev.evvie.waylandcraft.utils;
 
+import java.util.UUID;
+
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
+import dev.evvie.waylandcraft.item.WindowHandle;
 import net.minecraft.client.Minecraft;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
@@ -42,6 +48,30 @@ public class WaylandCraftUtils {
 		
 		Vec3 up = new Vec3(new Vector3f(0, 1, 0).rotate(rotation));
 		return up;
+	}
+	
+	public static ServerPlayer getPlayer(ServerLevel level, UUID id) {
+		for(ServerPlayer player : level.players()) {
+			UUID pid = WindowHandle.getPlayerUUID(player);
+			if(pid.equals(id)) return player;
+		}
+		return null;
+	}
+	
+	public static boolean isHandleValid(ServerLevel level, WindowHandle handle) {
+		if(handle == null) return false;
+		
+		ServerPlayer player = getPlayer(level, handle.player());
+		if(player == null) return false;
+		
+		return ((IMyServerPlayer) player).getAliveWindows().contains(handle.handle());
+	}
+	
+	public static boolean isHandleValid(MinecraftServer server, WindowHandle handle) {
+		for(ServerLevel level : server.getAllLevels()) {
+			if(isHandleValid(level, handle)) return true;
+		}
+		return false;
 	}
 	
 }
