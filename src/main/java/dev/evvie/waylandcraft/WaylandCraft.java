@@ -133,6 +133,7 @@ public class WaylandCraft implements ClientModInitializer {
 		LevelRenderEvents.END_EXTRACTION.register(this::updateWorld);
 		ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
 		ClientPlayConnectionEvents.JOIN.register(this::onClientJoin);
+		ClientPlayConnectionEvents.DISCONNECT.register(this::onClientDisconnect);
 		ItemTooltipCallback.EVENT.register(this::addWindowItemTooltip);
 		ClientTickEvents.START_CLIENT_TICK.register(itemManager);
 		
@@ -260,22 +261,20 @@ public class WaylandCraft implements ClientModInitializer {
 	
 	public void onClientTick(Minecraft minecraft) {
 		if(minecraft.player == null) return;
+		checkKeybinds(minecraft);
+	}
 		
+	private void checkKeybinds(Minecraft minecraft) {
 		if(keyOpenScreen.consumeClick()) {
 			keyboardCaptureMode = KeyboardCaptureMode.NONE;
 			pointerGrabs.releaseAll();
 			minecraft.setScreen(new WindowManagerScreen(WaylandCraft.instance));
-			return;
 		}
-		
-		if(keyOpenAppLauncher.consumeClick()) {
+		else if(keyOpenAppLauncher.consumeClick()) {
 			minecraft.setScreen(new AppLauncherScreen(WaylandCraft.instance));
-			return;
 		}
-		
-		if(keyCaptureKeyboard.consumeClick()) {
+		else if(keyCaptureKeyboard.consumeClick()) {
 			enableKeyboardCapture(false);
-			return;
 		}
 	}
 	
@@ -283,6 +282,11 @@ public class WaylandCraft implements ClientModInitializer {
 		minecraft.getChatListener().handleSystemMessage(Component.literal("Wayland compositor running on " + waylandSocket), false);
 		if(x11Display != null) minecraft.getChatListener().handleSystemMessage(Component.literal("xwayland-satellite running on " + x11Display), false);
 		itemManager.giveItemsIfMissing(bridge.getMappedToplevels());
+	}
+	
+	private void onClientDisconnect(ClientPacketListener listener, Minecraft minecraft) {
+		displays.clear();
+		itemManager.reset();
 	}
 	
 	@Nullable

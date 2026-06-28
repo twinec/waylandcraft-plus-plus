@@ -51,6 +51,10 @@ public class WindowItemManager implements WindowItemInteractionProvider, ClientT
 		syncedToplevels = handles;
 	}
 	
+	public void reset() {
+		syncedToplevels = new long[0];
+	}
+	
 	@Override
 	public boolean isValid(ItemStack itemStack) {
 		WLCToplevel toplevel = WaylandCraft.getToplevel(itemStack);

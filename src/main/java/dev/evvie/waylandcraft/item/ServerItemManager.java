@@ -2,12 +2,11 @@ package dev.evvie.waylandcraft.item;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.StreamSupport;
 
-import dev.evvie.waylandcraft.network.ServerboundAliveWindowsPayload;
 import dev.evvie.waylandcraft.network.ServerboundGiveItemsPayload;
 import dev.evvie.waylandcraft.utils.IMyServerPlayer;
+import dev.evvie.waylandcraft.utils.WaylandCraftUtils;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.particles.ParticleTypes;
@@ -28,7 +27,7 @@ public class ServerItemManager implements ServerTickEvents.StartLevelTick {
 				if(!item.is(WindowItem.WINDOW)) continue;
 				
 				WindowHandle handle = item.get(WindowItem.WINDOW_HANDLE);
-				if(!isHandleValid(level, handle)) {
+				if(!WaylandCraftUtils.isHandleValid(level, handle)) {
 					inv.setItem(i, ItemStack.EMPTY);
 				}
 			}
@@ -46,22 +45,12 @@ public class ServerItemManager implements ServerTickEvents.StartLevelTick {
 			.filter((e) -> e instanceof ItemEntity)
 			.map((e) -> (ItemEntity) e)
 			.filter((e) -> e.getItem().is(WindowItem.WINDOW))
-			.filter((e) -> !isHandleValid(level, e.getItem().get(WindowItem.WINDOW_HANDLE)))
+			.filter((e) -> !WaylandCraftUtils.isHandleValid(level, e.getItem().get(WindowItem.WINDOW_HANDLE)))
 			.filter((e) -> e.getAge() > 10)
 			.forEach((e) -> {
 				level.sendParticles(ParticleTypes.FLAME, false, false, e.getX(), e.getY(), e.getZ(), 10, 0.15, 0.2, 0.15, 0.1);
 				e.discard();
 			});
-	}
-	
-	public void handleAliveWindowsPayload(ServerboundAliveWindowsPayload payload, ServerPlayNetworking.Context ctx) {
-		IMyServerPlayer plr = (IMyServerPlayer) ctx.player();
-		ArrayList<Long> handles = plr.getAliveWindows();
-		handles.clear();
-		
-		for(long handle : payload.handles()) {
-			handles.add(handle);
-		}
 	}
 	
 	public void handleGiveItemsPayload(ServerboundGiveItemsPayload payload, ServerPlayNetworking.Context ctx) {
@@ -77,23 +66,6 @@ public class ServerItemManager implements ServerTickEvents.StartLevelTick {
 		
 		if(payload.missingOnly()) giveItemsIfMissing(ctx.player(), handles);
 		else giveItems(ctx.player(), handles);
-	}
-	
-	private static ServerPlayer getPlayer(ServerLevel level, UUID id) {
-		for(ServerPlayer player : level.players()) {
-			UUID pid = WindowHandle.getPlayerUUID(player);
-			if(pid.equals(id)) return player;
-		}
-		return null;
-	}
-	
-	private boolean isHandleValid(ServerLevel level, WindowHandle handle) {
-		if(handle == null) return false;
-		
-		ServerPlayer player = getPlayer(level, handle.player());
-		if(player == null) return false;
-		
-		return ((IMyServerPlayer) player).getAliveWindows().contains(handle.handle());
 	}
 	
 	public void giveItems(ServerPlayer player, List<Long> handles) {
