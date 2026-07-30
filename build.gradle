@@ -1,6 +1,7 @@
 plugins {
 	id 'net.fabricmc.fabric-loom' version "${loom_version}"
 	id 'maven-publish'
+	id 'com.modrinth.minotaur' version '2.+'
 }
 
 version = project.mod_version
@@ -136,6 +137,39 @@ loom {
 		}
 	}
 }
+
+// Publishing to Modrinth. This is only ever driven from CI (see
+// .github/workflows/release.yml), triggered by pushing a version tag --
+// the jar handed to Minotaur here is the exact same one 'build' just
+// produced from this checkout, so what ends up on Modrinth is provably
+// built from the tagged source, not something assembled by hand.
+//
+// MODRINTH_TOKEN and MODRINTH_PROJECT_ID come from the environment (a
+// repo secret and a repo variable respectively) so this file never needs
+// to contain either. Locally, both are unset, MINOTAUR_TOKEN_MISSING
+// stays true, and `./gradlew modrinth` becomes a deliberate no-op
+// instead of failing or accidentally publishing.
+modrinth {
+	token = System.getenv("MODRINTH_TOKEN") ?: "MINOTAUR_TOKEN_MISSING"
+	projectId = System.getenv("MODRINTH_PROJECT_ID") ?: "MINOTAUR_PROJECT_ID_MISSING"
+	versionNumber = project.version
+	versionName = "WaylandCraft++ ${project.version}"
+	versionType = System.getenv("MODRINTH_VERSION_TYPE") ?: "release"
+	changelog = System.getenv("MODRINTH_CHANGELOG") ?: "See the GitHub release for details."
+	uploadFile = tasks.remapJar
+	gameVersions = [project.minecraft_version]
+	loaders = ["fabric"]
+}
+
+tasks.modrinth.onlyIf {
+	def ready = System.getenv("MODRINTH_TOKEN") != null && System.getenv("MODRINTH_PROJECT_ID") != null
+	if(!ready) {
+		logger.lifecycle("Skipping Modrinth publish: MODRINTH_TOKEN/MODRINTH_PROJECT_ID not set in the environment.")
+	}
+	ready
+}
+
+tasks.modrinth.dependsOn tasks.build
 
 // configure the maven publication
 publishing {
