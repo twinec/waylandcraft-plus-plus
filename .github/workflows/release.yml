@@ -3,6 +3,15 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 3.1) -- becomes tag vX.Y and the mod_version in gradle.properties'
+        required: true
+      changelog:
+        description: 'Changelog for this version (optional)'
+        required: false
+        default: 'See the GitHub release for details.'
 
 # Everything here runs from the exact tagged commit -- the jar published
 # to Modrinth, attached to the GitHub Release, and covered by the
@@ -14,7 +23,46 @@ permissions:
   attestations: write
 
 jobs:
+  # Only runs for a manual (workflow_dispatch) release: bumps
+  # gradle.properties, commits, tags, and pushes -- so clicking "Run
+  # workflow" in the Actions tab is enough to cut a release, with no git
+  # access needed locally. A tag pushed this way still lands as a normal,
+  # public, immutable git tag; every later job builds from that exact
+  # commit, same as if the tag had been pushed by hand.
+  prepare:
+    runs-on: ubuntu-22.04
+    outputs:
+      ref: ${{ steps.resolve.outputs.ref }}
+      version: ${{ steps.resolve.outputs.version }}
+      changelog: ${{ steps.resolve.outputs.changelog }}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+    - name: Bump version, tag, and push
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        sed -i "s/^mod_version=.*/mod_version=${{ inputs.version }}/" gradle.properties
+        git commit -am "Release v${{ inputs.version }}"
+        git tag "v${{ inputs.version }}"
+        git push origin HEAD:${{ github.ref_name }} "v${{ inputs.version }}"
+    - name: Resolve version/ref/changelog for later jobs
+      id: resolve
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "ref=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          echo "changelog=${{ inputs.changelog }}" >> "$GITHUB_OUTPUT"
+        else
+          echo "ref=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          echo "changelog=${{ github.event.head_commit.message }}" >> "$GITHUB_OUTPUT"
+        fi
+
   compile-native-libs:
+    needs: prepare
     strategy:
       matrix:
         platform:
@@ -27,6 +75,8 @@ jobs:
     runs-on: ${{ matrix.platform.runs-on }}
     steps:
     - uses: actions/checkout@v6
+      with:
+        ref: ${{ needs.prepare.outputs.ref }}
     - name: Install dependencies
       run: sudo apt install -y libxkbcommon-dev
     - name: Setup rust toolchain
@@ -47,9 +97,11 @@ jobs:
 
   build-and-release:
     runs-on: ubuntu-22.04
-    needs: compile-native-libs
+    needs: [prepare, compile-native-libs]
     steps:
     - uses: actions/checkout@v6
+      with:
+        ref: ${{ needs.prepare.outputs.ref }}
     - name: Download native libs
       uses: actions/download-artifact@v8
       with:
@@ -77,11 +129,12 @@ jobs:
       env:
         MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
         MODRINTH_PROJECT_ID: ${{ vars.MODRINTH_PROJECT_ID }}
-        MODRINTH_CHANGELOG: ${{ github.event.head_commit.message }}
+        MODRINTH_CHANGELOG: ${{ needs.prepare.outputs.changelog }}
       run: ./gradlew modrinth
 
     - name: Create GitHub release
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: ${{ needs.prepare.outputs.ref }}
         files: build/libs/waylandcraft.jar
         generate_release_notes: true
