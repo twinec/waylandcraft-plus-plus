@@ -149,11 +149,12 @@ loom {
 // to contain either. Locally, both are unset, MINOTAUR_TOKEN_MISSING
 // stays true, and `./gradlew modrinth` becomes a deliberate no-op
 // instead of failing or accidentally publishing.
-// tasks.named("remapJar") (not tasks.remapJar / tasks.getByName) is
-// required here -- this Loom version doesn't have remapJar registered
-// yet at the point this script line evaluates, and the lazy
-// TaskProvider from named() defers that lookup until it's actually
-// needed instead of failing immediately with "unknown property".
+// Pointing uploadFile at the known output path rather than a Loom task
+// reference (e.g. tasks.remapJar/tasks.named("remapJar")) -- this Loom
+// version (1.17.17) doesn't register a task under that name at all, and
+// the jar{} block above and every workflow in .github/workflows already
+// agree the final jar lands at build/libs/waylandcraft.jar, so there's
+// no need to guess Loom's internal task naming for this version.
 modrinth {
 	token = System.getenv("MODRINTH_TOKEN") ?: "MINOTAUR_TOKEN_MISSING"
 	projectId = System.getenv("MODRINTH_PROJECT_ID") ?: "MINOTAUR_PROJECT_ID_MISSING"
@@ -161,7 +162,7 @@ modrinth {
 	versionName = "WaylandCraft++ ${project.version}"
 	versionType = System.getenv("MODRINTH_VERSION_TYPE") ?: "release"
 	changelog = System.getenv("MODRINTH_CHANGELOG") ?: "See the GitHub release for details."
-	uploadFile = tasks.named("remapJar")
+	uploadFile = file("build/libs/waylandcraft.jar")
 	gameVersions = [project.minecraft_version]
 	loaders = ["fabric"]
 }
