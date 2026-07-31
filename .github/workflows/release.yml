@@ -51,14 +51,26 @@ jobs:
     - name: Resolve version/ref/changelog for later jobs
       id: resolve
       run: |
+        # Commit messages/changelog text can be multi-line, which breaks the
+        # plain "key=value" GITHUB_OUTPUT format -- the heredoc form with a
+        # random delimiter is required so embedded newlines don't corrupt it.
+        delim="EOF_$(uuidgen)"
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           echo "ref=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
           echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-          echo "changelog=${{ inputs.changelog }}" >> "$GITHUB_OUTPUT"
+          {
+            echo "changelog<<$delim"
+            echo "${{ inputs.changelog }}"
+            echo "$delim"
+          } >> "$GITHUB_OUTPUT"
         else
           echo "ref=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-          echo "changelog=${{ github.event.head_commit.message }}" >> "$GITHUB_OUTPUT"
+          {
+            echo "changelog<<$delim"
+            echo "${{ github.event.head_commit.message }}"
+            echo "$delim"
+          } >> "$GITHUB_OUTPUT"
         fi
 
   compile-native-libs:
