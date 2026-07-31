@@ -135,7 +135,7 @@ jobs:
     - name: Attest build provenance
       uses: actions/attest-build-provenance@v3
       with:
-        subject-path: build/libs/waylandcraft.jar
+        subject-path: build/libs/waylandcraft_plus_plus.jar
 
     - name: Publish to Modrinth
       env:
@@ -148,5 +148,5 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ needs.prepare.outputs.ref }}
-        files: build/libs/waylandcraft.jar
+        files: build/libs/waylandcraft_plus_plus.jar
         generate_release_notes: true

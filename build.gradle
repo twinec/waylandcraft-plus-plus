@@ -151,10 +151,10 @@ loom {
 // instead of failing or accidentally publishing.
 // Pointing uploadFile at the known output path rather than a Loom task
 // reference (e.g. tasks.remapJar/tasks.named("remapJar")) -- this Loom
-// version (1.17.17) doesn't register a task under that name at all, and
-// the jar{} block above and every workflow in .github/workflows already
-// agree the final jar lands at build/libs/waylandcraft.jar, so there's
-// no need to guess Loom's internal task naming for this version.
+// version (1.17.17) doesn't register a task under that name at all.
+// The file name itself comes from archives_base_name (gradle.properties),
+// not a literal "waylandcraft.jar" -- keep it derived so a rename there
+// can't silently desync this from the actual build output again.
 modrinth {
 	token = System.getenv("MODRINTH_TOKEN") ?: "MINOTAUR_TOKEN_MISSING"
 	projectId = System.getenv("MODRINTH_PROJECT_ID") ?: "MINOTAUR_PROJECT_ID_MISSING"
@@ -162,7 +162,7 @@ modrinth {
 	versionName = "WaylandCraft++ ${project.version}"
 	versionType = System.getenv("MODRINTH_VERSION_TYPE") ?: "release"
 	changelog = System.getenv("MODRINTH_CHANGELOG") ?: "See the GitHub release for details."
-	uploadFile = file("build/libs/waylandcraft.jar")
+	uploadFile = file("build/libs/${project.archives_base_name}.jar")
 	gameVersions = [project.minecraft_version]
 	loaders = ["fabric"]
 }
