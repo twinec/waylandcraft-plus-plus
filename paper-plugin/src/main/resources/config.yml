@@ -1,0 +1,4 @@
+# The vanilla item used to represent WaylandCraft++ window items on this
+# Paper server (Paper can't register a genuine custom Item type the way
+# the Fabric mod does). Must be a valid org.bukkit.Material name.
+item: PAPER

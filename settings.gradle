@@ -8,3 +8,9 @@ pluginManagement {
 		gradlePluginPortal()
 	}
 }
+
+// Standalone Paper plugin providing server-side support for window items
+// on Paper servers, which can't load the Fabric mod at all. Deliberately
+// a separate module, not part of the root Fabric project -- see
+// paper-plugin/build.gradle.
+include 'paper-plugin'

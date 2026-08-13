@@ -233,19 +233,17 @@ public class WaylandCraft implements ClientModInitializer {
 		if(Minecraft.getInstance().player == null || !Minecraft.getInstance().player.isUsingItem()) playerUsingWindowItem = false;
 		if(playerUsingWindowItem) {
 			ItemStack item = Minecraft.getInstance().player.getUseItem();
-			if(item.is(WindowItem.WINDOW)) {
-				WLCToplevel toplevel = getToplevel(item);
-				
-				if(toplevel != null) {
-					WindowDisplay display = getOrCreateDisplay(toplevel);
-					if(!playerWasUsingWindowItem) {
-						display.anchorDistance = 2.0;
-					}
-					
-					display.doGrabMove(camera.position(), new Vec3(camera.forwardVector()), new Vec3(camera.upVector()), camera.yRot());
-					
-					WaylandCraft.instance.bridge.focusSurface(toplevel);
+			WLCToplevel toplevel = getToplevel(item);
+
+			if(toplevel != null) {
+				WindowDisplay display = getOrCreateDisplay(toplevel);
+				if(!playerWasUsingWindowItem) {
+					display.anchorDistance = 2.0;
 				}
+
+				display.doGrabMove(camera.position(), new Vec3(camera.forwardVector()), new Vec3(camera.upVector()), camera.yRot());
+
+				WaylandCraft.instance.bridge.focusSurface(toplevel);
 			}
 			else playerUsingWindowItem = false;
 		}
@@ -309,6 +307,7 @@ public class WaylandCraft implements ClientModInitializer {
 		if(WaylandCraft.instance.bridge == null) return null;
 		
 		WindowHandle data = item.get(WindowItem.WINDOW_HANDLE);
+		if(data == null) data = WindowHandle.fromCustomData(item);
 		if(data == null) return null;
 		if(!data.matchesPlayer(Minecraft.getInstance().player)) return null;
 		
