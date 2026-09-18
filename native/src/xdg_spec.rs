@@ -4,7 +4,7 @@ use freedesktop_desktop_entry::{
     DesktopEntry, desktop_entries, find_app_by_id, get_languages_from_env,
     unicase::Ascii,
 };
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::ffi::OsString;
 use std::path::PathBuf;
 
@@ -12,6 +12,7 @@ pub struct XDGSpecHelper {
     locales: Vec<String>,
     entries: Vec<DesktopEntry>,
     preferred_terminal: String,
+    env_overrides: HashMap<String, String>,
 }
 
 pub struct RawDesktopEntry {
@@ -36,11 +37,24 @@ impl XDGSpecHelper {
             locales,
             entries,
             preferred_terminal: String::new(),
+            env_overrides: HashMap::new(),
         }
     }
 
     pub fn set_preferred_terminal(&mut self, cmd: String) {
         self.preferred_terminal = cmd;
+    }
+
+    // Replaces the current set of env var overrides wholesale. These take
+    // precedence over exec_app's built-in defaults, letting users tweak
+    // things like DBUS_SESSION_BUS_ADDRESS at runtime instead of needing a
+    // native code change and recompile.
+    pub fn set_env_overrides(&mut self, overrides: HashMap<String, String>) {
+        self.env_overrides = overrides;
+    }
+
+    pub fn env_overrides(&self) -> &HashMap<String, String> {
+        &self.env_overrides
     }
 
     fn to_raw(&self, entry: &DesktopEntry) -> RawDesktopEntry {
