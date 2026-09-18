@@ -5,6 +5,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -12,13 +13,22 @@ import java.util.stream.Stream;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
-import org.lwjgl.glfw.GLFWNativeEGL;
 import org.lwjgl.system.Platform;
+
+import com.mojang.blaze3d.opengl.GlDevice;
+import com.mojang.blaze3d.systems.GpuDeviceBackend;
+import com.mojang.blaze3d.systems.RenderSystem;
 
 import dev.evvie.waylandcraft.WaylandCraftCommon;
 import dev.evvie.waylandcraft.bridge.WLCAbstractWindow.SurfaceGeometry;
+import dev.evvie.waylandcraft.bridge.dmabuf.Dmabuf;
+import dev.evvie.waylandcraft.bridge.dmabuf.DmabufFeedbackData;
+import dev.evvie.waylandcraft.bridge.dmabuf.DmabufFormat;
 import dev.evvie.waylandcraft.desktop.RawDesktopEntry;
+import dev.evvie.waylandcraft.egl.EGL;
+import dev.evvie.waylandcraft.egl.EGLHelper;
+import dev.evvie.waylandcraft.render.BufferTexture;
+import dev.evvie.waylandcraft.render.BufferTexture.DmabufImportFailedException;
 import dev.evvie.waylandcraft.render.BufferTexture.DmabufTexture;
 import dev.evvie.waylandcraft.render.WindowFramebuffer;
 import dev.evvie.waylandcraft.utils.CursorShape;
@@ -107,18 +117,76 @@ public class WaylandCraftBridge {
 	}
 	
 	public static WaylandCraftBridge start() {
-		long eglDisplay = GLFWNativeEGL.glfwGetEGLDisplay();
-		if(eglDisplay == 0) {
-			throw new RuntimeException("Failed to get EGL display!");
-		}
+		DmabufFeedbackData dmabufFeedbackData = initBackend();
 		
-		long handle = init(GLFW.Functions.GetProcAddress, eglDisplay);
+		long handle = init(dmabufFeedbackData);
 		WaylandCraftBridge bridge = new WaylandCraftBridge(handle);
 		
 		// Add shutdown thread to clean up resources on normal exit
 		Runtime.getRuntime().addShutdownHook(new Thread(bridge::shutdownHook));
 		
 		return bridge;
+	}
+	
+	private static DmabufFeedbackData initBackend() {
+		GpuDeviceBackend deviceBackend = RenderSystem.getDevice().backend;
+		if(deviceBackend instanceof GlDevice) {
+			return initBackendEGL();
+		}
+		
+		WaylandCraftCommon.LOGGER.error("Unsupported graphics backend!");
+		return null;
+	}
+	
+	private static DmabufFeedbackData initBackendEGL() {
+		long eglDisplay = EGL.getEGLDisplay();
+		if(eglDisplay == 0) {
+			throw new RuntimeException("Failed to get EGL display!");
+		}
+
+		String renderNodePath = EGLHelper.queryRenderNodePath(eglDisplay);
+		DmabufFormat[] formats = EGLHelper.queryDmabufFormats(eglDisplay).toArray(DmabufFormat[]::new);
+
+		Long device = openRenderNode(renderNodePath);
+		if(device == null) {
+			WaylandCraftCommon.LOGGER.error("Failed to get a render node; dmabuf-based window rendering will be disabled");
+			return null;
+		}
+
+		return new DmabufFeedbackData(device, formats);
+	}
+
+	// EGL_EXT_device_query/EGL_EXT_device_base (used by EGLHelper.queryRenderNodePath) are known
+	// to get clobbered when an overlay like MangoHud is loaded into the process, which used to
+	// crash the game outright. Fall back to scanning /dev/dri directly for a render node when the
+	// EGL path comes back empty or doesn't resolve to a usable device.
+	private static Long openRenderNode(String renderNodePath) {
+		if(renderNodePath != null) {
+			try {
+				return drmDeviceByPath(renderNodePath);
+			} catch(Throwable e) {
+				WaylandCraftCommon.LOGGER.error("Querying the render node via EGL failed ({}), falling back to scanning /dev/dri", e.getMessage());
+			}
+		}
+		else {
+			WaylandCraftCommon.LOGGER.error("Failed to query render node path via EGL, falling back to scanning /dev/dri");
+		}
+
+		File[] candidates = new File("/dev/dri").listFiles((dir, name) -> name.startsWith("renderD"));
+		if(candidates == null) {
+			return null;
+		}
+
+		Arrays.sort(candidates);
+		for(File candidate : candidates) {
+			try {
+				return drmDeviceByPath(candidate.getPath());
+			} catch(Throwable e) {
+				// Try the next candidate
+			}
+		}
+
+		return null;
 	}
 	
 	private void shutdownHook() {
@@ -179,10 +247,6 @@ public class WaylandCraftBridge {
 		return null;
 	}
 	
-	protected void addDmabuf(DmabufTexture dmabuf) {
-		dmabufs.add(dmabuf);
-	}
-	
 	private void deleteNonExistingToplevels(long[] remainingHandles) {
 		ArrayList<WLCToplevel> toplevels_new = new ArrayList<WLCToplevel>();
 		for(WLCToplevel toplevel : this.toplevels) {
@@ -209,13 +273,25 @@ public class WaylandCraftBridge {
 		this.popups = popups_new;
 	}
 	
+	protected boolean importDmabuf(Dmabuf dmabuf) {
+		try {
+			DmabufTexture texture = BufferTexture.createDmabufTexture(dmabuf);
+			dmabufs.add(texture);
+			return true;
+		} catch(DmabufImportFailedException e) {
+			return false;
+		}
+	}
+	
 	private void updateDmabufs() {
+		checkImportDmabuf(instance);
+		
 		long[] remainingHandles = dmabufs(instance);
 		ArrayList<DmabufTexture> dmabufs_new = new ArrayList<DmabufTexture>();
 		for(DmabufTexture dmabuf : this.dmabufs) {
-			// If the dmabuf texture is not attached to a real wl_buffer anymore, free the EGL resources
+			// If the dmabuf texture is not attached to a real wl_buffer anymore, free the imported resources
 			boolean retained = ArrayUtils.contains(remainingHandles, dmabuf.handle);
-			if(!retained) dmabuf.freeEGL();
+			if(!retained) dmabuf.doFree();
 			
 			// Remove it from the list and free the texture if no longer attached to any surface
 			boolean used = false;
@@ -242,6 +318,7 @@ public class WaylandCraftBridge {
 				surfaces_new.add(surface);
 			}
 			else {
+				surface.destroy();
 				freeSurface(this.instance, surface.takeHandle());
 			}
 		}
@@ -665,6 +742,10 @@ public class WaylandCraftBridge {
 		setPreferredTerminal(instance, cmd);
 	}
 	
+	public void setEnvOverrides(String overrides) {
+		setEnvOverrides(instance, overrides);
+	}
+	
 	public void setKeymapDefault() {
 		setKeymapDefault(instance);
 	}
@@ -700,7 +781,7 @@ public class WaylandCraftBridge {
 	
 	public static record ResizeRequest(int serial, int edges) {}
 	
-	private static native long init(long glfwGetProcAddress, long eglDisplay);
+	private static native long init(@Nullable DmabufFeedbackData dmabufFeedbackData);
 	private static native void shutdown(long instance);
 	private static native void dispatchClients(long instance);
 	private static native void flushDisplay(long instance);
@@ -756,6 +837,9 @@ public class WaylandCraftBridge {
 	private static native int[] surfaceXDGGeometry(long surfaceHandle);
 	
 	private static native long[] dmabufs(long instance);
+	
+	// Check if there are new dmabufs waiting to be imported. If yes, importDmabuf() will be called
+	private native void checkImportDmabuf(long instance);
 	
 	// Updates the surface tree given by the root surface
 	// This changes the doubly linked list of the WLCSurfaces.
@@ -822,6 +906,7 @@ public class WaylandCraftBridge {
 	
 	private static native boolean execApp(long instance, String appId);
 	private static native void setPreferredTerminal(long instance, String cmd);
+	private static native void setEnvOverrides(long instance, String overrides);
 	
 	private static native void setKeymapDefault(long instance);
 	private static native String exportKeymap(long instance);
@@ -833,5 +918,8 @@ public class WaylandCraftBridge {
 	private static native void dndDrop(long instance);
 	private static native void dndMotion(long instance, long surfaceHandle, double x, double y);
 	private static native long dndIcon(long instance);
+	
+	private static native long drmDeviceByPath(String path);
+	private static native long drmDeviceByMajorMinor(int major, int minor);
 	
 }

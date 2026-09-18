@@ -49,10 +49,10 @@ import net.minecraft.resources.Identifier;
 public class WindowFramebuffer implements FramebufferRenderable {
 
 	private static final BindGroupLayout WINDOW_SAMPLER_LAYOUT = BindGroupLayout.builder()
-		.withSampler("sampler")
+		.withSampler("Sampler0")
 		.build();
 	private static final BindGroupLayout WINDOW_INFO_LAYOUT = BindGroupLayout.builder()
-		.withUniform("window_info", UniformType.UNIFORM_BUFFER)
+		.withUniform("WindowInfo", UniformType.UNIFORM_BUFFER)
 		.build();
 
 	public static final RenderPipeline WINDOW_PIPELINE = RenderPipelines.register(
@@ -211,8 +211,8 @@ public class WindowFramebuffer implements FramebufferRenderable {
 			try(RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "window framebuffer", tempTarget.getColorTextureView(), Optional.of(new Vector4f(0, 0, 0, 0)))) {
 				pass.setPipeline(WINDOW_PIPELINE);
 				for(CompiledBufferDraw element : elements) {
-					pass.setUniform("window_info", element.alpha ? alphaUniforms : opaqueUniforms);
-					pass.bindTexture("sampler", element.textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+					pass.setUniform("WindowInfo", element.alpha ? alphaUniforms : opaqueUniforms);
+					pass.bindTexture("Sampler0", element.textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
 					pass.setVertexBuffer(0, element.vertexBuffer.slice());
 					pass.setIndexBuffer(element.indexBuffer, element.indexType);
 					pass.drawIndexed(element.indexCount, 1, 0, 0, 0);
@@ -230,7 +230,7 @@ public class WindowFramebuffer implements FramebufferRenderable {
 		try(RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "window framebuffer unpremultiply", target.getColorTextureView(), Optional.empty())) {
 			pass.setPipeline(UNPREMULTIPLY_PIPELINE);
 			RenderSystem.bindDefaultUniforms(pass);
-			pass.bindTexture("sampler", tempTarget.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+			pass.bindTexture("Sampler0", tempTarget.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
 			pass.draw(3, 1, 0, 0);
 		}
 	}
@@ -249,7 +249,7 @@ public class WindowFramebuffer implements FramebufferRenderable {
 		try {
 			try(RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "window framebuffer damage", tempTarget.getColorTextureView(), Optional.empty())) {
 				pass.setPipeline(DAMAGE_PIPELINE);
-				pass.setUniform("window_info", opaqueUniforms);
+				pass.setUniform("WindowInfo", opaqueUniforms);
 				for(CompiledBufferDraw element : damageElements) {
 					pass.setVertexBuffer(0, element.vertexBuffer.slice());
 					pass.setIndexBuffer(element.indexBuffer, element.indexType);
