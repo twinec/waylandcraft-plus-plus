@@ -137,8 +137,9 @@ fn init_dmabuf(
     state: &mut DmabufState,
     egl: &EGLHelper,
 ) -> DmabufGlobal {
-    let render_node =
-        egl.get_render_node().expect("Failed to get render node!");
+    let render_node = egl
+        .get_render_node()
+        .expect("Failed to find any GPU render node (checked EGL device query extensions and /dev/dri)!");
     let render_node_id = render_node.dev_id();
     let formats = egl.query_dmabuf_formats();
 

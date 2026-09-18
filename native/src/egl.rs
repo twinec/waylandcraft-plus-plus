@@ -126,6 +126,18 @@ impl EGLHelper {
     }
 
     pub fn get_render_node(&self) -> Result<DrmNode, ()> {
+        self.get_render_node_via_egl().or_else(|_| {
+            eprintln!(
+                "Falling back to scanning /dev/dri for a render node. \
+                (The EGL_EXT_device_query/EGL_EXT_device_base extensions we \
+                normally use for this are known to get clobbered when an \
+                overlay like MangoHud is loaded into the process.)"
+            );
+            Self::find_fallback_render_node()
+        })
+    }
+
+    fn get_render_node_via_egl(&self) -> Result<DrmNode, ()> {
         let mut dev_ret: EGLAttrib = 0;
 
         if (self.eglQueryDisplayAttribEXT)(
@@ -183,6 +195,32 @@ impl EGLHelper {
 
         // If all else fails, just return the drm master node
         Ok(drm_device)
+    }
+
+    // Last-resort fallback for when the EGL device-query extensions are
+    // unavailable or unusable (observed with MangoHud loaded into the
+    // process, which appears to interfere with them). Picks the
+    // lowest-numbered render node under /dev/dri, which is correct on the
+    // overwhelming majority of single-GPU systems and at least gives us a
+    // usable node on multi-GPU systems rather than crashing outright.
+    fn find_fallback_render_node() -> Result<DrmNode, ()> {
+        let mut candidates: Vec<_> = std::fs::read_dir("/dev/dri")
+            .map_err(|_| ())?
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with("renderD"))
+            })
+            .collect();
+
+        candidates.sort();
+
+        candidates
+            .into_iter()
+            .find_map(|path| DrmNode::from_path(path).ok())
+            .ok_or(())
     }
 
     pub fn dmabuf_to_image(&self, dmabuf: &Dmabuf) -> Result<EGLImage, ()> {
