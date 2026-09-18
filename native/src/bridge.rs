@@ -42,6 +42,8 @@ use smithay::{
         viewporter::{ViewportCachedState, ensure_viewport_valid},
     },
 };
+use std::collections::HashMap;
+use std::ffi::OsString;
 use std::ops::DerefMut;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -348,6 +350,10 @@ bind_java_type! {
         static extern fn set_preferred_terminal {
             sig = (instance: jlong, cmd: JString),
             fn = set_preferred_terminal,
+        },
+        static extern fn set_env_overrides {
+            sig = (instance: jlong, overrides: JString),
+            fn = set_env_overrides,
         },
         static extern fn set_keymap_default {
             sig = (instance: jlong),
@@ -1899,6 +1905,18 @@ fn exec_app<'local>(
         env_vars.push(("DISPLAY".into(), s.get_display().into()));
     }
 
+    // User-configured overrides win over the defaults above, so a single env
+    // var can be tweaked (see WaylandCraftSettingsManager#loadEnvOverrides)
+    // without needing a native code change and recompile.
+    for (key, value) in instance.xdg.env_overrides() {
+        let key = OsString::from(key);
+        let value = OsString::from(value);
+        match env_vars.iter_mut().find(|(k, _)| *k == key) {
+            Some(existing) => existing.1 = value,
+            None => env_vars.push((key, value)),
+        }
+    }
+
     Ok(instance.xdg.exec_app(app_id, env_vars))
 }
 
@@ -1912,6 +1930,34 @@ fn set_preferred_terminal<'local>(
     let cmd = cmd.try_to_string(env)?;
 
     instance.xdg.set_preferred_terminal(cmd);
+
+    Ok(())
+}
+
+// `overrides` is a simple "KEY=VALUE" per-line blob (blank lines and lines
+// starting with '#' are ignored), matching the env.txt file format read by
+// WaylandCraftSettingsManager#loadEnvOverrides.
+fn set_env_overrides<'local>(
+    env: &mut Env<'local>,
+    _class: JClass<'local>,
+    instance: jlong,
+    overrides: JString<'local>,
+) -> Result<(), BridgeError> {
+    let instance = jptr_to_instance!(instance, "setEnvOverrides")?;
+    let overrides = overrides.try_to_string(env)?;
+
+    let mut parsed = HashMap::new();
+    for line in overrides.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some((key, value)) = line.split_once('=') {
+            parsed.insert(key.trim().to_string(), value.trim().to_string());
+        }
+    }
+
+    instance.xdg.set_env_overrides(parsed);
 
     Ok(())
 }
