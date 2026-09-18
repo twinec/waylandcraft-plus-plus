@@ -100,20 +100,33 @@ public class WaylandCraftSettingsManager {
 		wlc.bridge.setEnvOverrides(blob.toString());
 	}
 	
-	public Map<String, String> getEnvOverrides() {
-		return wlc.settings.getEnvOverrides();
+	// Single-line settings-screen text box representation of the env override map,
+	// e.g. "QT_QPA_PLATFORM=wayland;DBUS_SESSION_BUS_ADDRESS=unix:path=/dev/null"
+	public String getEnvOverridesText() {
+		StringBuilder text = new StringBuilder();
+		for(Map.Entry<String, String> entry : wlc.settings.getEnvOverrides().entrySet()) {
+			if(text.length() > 0) text.append(';');
+			text.append(entry.getKey()).append('=').append(entry.getValue());
+		}
+		return text.toString();
 	}
 	
-	// Set (or add) a single env var override, write it to file, and push it to native
-	public void setEnvOverride(String key, String value) {
-		wlc.settings.getEnvOverrides().put(key, value);
-		writeSettings();
-		applyEnvOverrides();
-	}
-	
-	// Remove a single env var override, write the change to file, and push it to native
-	public void removeEnvOverride(String key) {
-		wlc.settings.getEnvOverrides().remove(key);
+	// Replaces the whole env override map from a settings-screen text box value,
+	// writes it to file, and pushes it to native
+	public void setEnvOverridesText(String text) {
+		Map<String, String> overrides = wlc.settings.getEnvOverrides();
+		overrides.clear();
+		
+		for(String pair : text.split(";")) {
+			pair = pair.trim();
+			if(pair.isEmpty()) continue;
+			
+			int eq = pair.indexOf('=');
+			if(eq < 0) continue;
+			
+			overrides.put(pair.substring(0, eq).trim(), pair.substring(eq + 1).trim());
+		}
+		
 		writeSettings();
 		applyEnvOverrides();
 	}
