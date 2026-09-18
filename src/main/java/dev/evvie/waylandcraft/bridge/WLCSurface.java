@@ -8,8 +8,6 @@ import org.jetbrains.annotations.Nullable;
 import dev.evvie.waylandcraft.WaylandCraft;
 import dev.evvie.waylandcraft.render.BufferTexture;
 import dev.evvie.waylandcraft.render.BufferTexture.DmabufTexture;
-import dev.evvie.waylandcraft.render.BufferTexture.ShmBufferTexture;
-import dev.evvie.waylandcraft.render.BufferTexture.SinglePixelBufferTexture;
 import net.minecraft.util.Mth;
 
 public class WLCSurface {
@@ -70,13 +68,16 @@ public class WLCSurface {
 		return handle != 0;
 	}
 	
+	protected void destroy() {
+		if(buffer != null) buffer.release();
+	}
+	
 	// Attach a shared memory buffer
 	// The surface width and height are reset to the given buffer dimensions.
 	protected void attachShmBuffer(long ptr, int width, int height, int format, int stride) {
-		if(this.buffer != null) {
-			this.buffer.release();
-		}
-		this.buffer = new ShmBufferTexture(ptr, width, height, format, stride);
+		removeBuffer();
+		
+		this.buffer = BufferTexture.createShmTexture(ptr, width, height, format, stride);
 		this.width = width;
 		this.height = height;
 	}
@@ -84,10 +85,9 @@ public class WLCSurface {
 	// Attach a single pixel buffer
 	// The surface width and height are reset to 1.
 	protected void attachSinglePixelBuffer(byte r, byte g, byte b, byte a) {
-		if(this.buffer != null) {
-			this.buffer.release();
-		}
-		this.buffer = new SinglePixelBufferTexture(r, g, b, a);
+		removeBuffer();
+		
+		this.buffer = BufferTexture.createSinglePixelTexture(r, g, b, a);
 		this.width = 1;
 		this.height = 1;
 	}
@@ -96,33 +96,21 @@ public class WLCSurface {
 	// The surface width and height are reset to the given buffer dimensions.
 	// Returns false if no DmabufTexture by that handle was found.
 	protected boolean attachDmabuf(long handle) {
-		if(this.buffer != null) {
-			this.buffer.release();
-		}
+		removeBuffer();
 		
-		this.buffer = WaylandCraft.instance.bridge.getDmabuf(handle);
-		if(this.buffer != null) {
-			this.width = buffer.width;
-			this.height = buffer.height;
-			
-			DmabufTexture dmabuf = (DmabufTexture) this.buffer;
-			dmabuf.copyData();
-		}
-		return this.buffer != null;
-	}
-	
-	// Create and attach a new DmabufTexture
-	// MUST only be used when attachDmabuf returns false for this handle!
-	protected void attachNewDmabuf(long handle, long eglImage, int width, int height) {
-		DmabufTexture dmabuf = new DmabufTexture(handle, eglImage, width, height);
-		WaylandCraft.instance.bridge.addDmabuf(dmabuf);
+		DmabufTexture dmabuf = WaylandCraft.instance.bridge.getDmabuf(handle);
+		if(dmabuf == null) return false;
 		
-		if(!attachDmabuf(handle)) {
-			throw new RuntimeException("Failed to attach newly created dmabuf");
-		}
+		this.buffer = dmabuf;
+		this.width = buffer.width;
+		this.height = buffer.height;
+		
+		dmabuf.copyData();
+		return true;
 	}
 	
 	protected void removeBuffer() {
+		if(buffer != null) buffer.release();
 		this.buffer = null;
 		this.width = this.height = 0;
 	}
