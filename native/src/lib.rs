@@ -1,12 +1,12 @@
 use crate::bridge::BridgeState;
 use crate::ddm::WLCDataState;
-use crate::egl::EGLHelper;
 use crate::output::WLCOutput;
 use crate::satellite::SatelliteState;
 use crate::seat::WLCSeatState;
 use crate::xdg_spec::XDGSpecHelper;
+use libc::dev_t;
 use smithay::{
-    backend::allocator::dmabuf::Dmabuf,
+    backend::allocator::{Format, dmabuf::Dmabuf},
     delegate_compositor, delegate_dmabuf, delegate_shm,
     delegate_single_pixel_buffer, delegate_viewporter, delegate_xdg_shell,
     reexports::{
@@ -28,8 +28,8 @@ use smithay::{
             CompositorClientState, CompositorHandler, CompositorState,
         },
         dmabuf::{
-            DmabufFeedbackBuilder, DmabufGlobal, DmabufHandler, DmabufState,
-            ImportNotifier,
+            self, DmabufFeedbackBuilder, DmabufGlobal, DmabufHandler,
+            DmabufState,
         },
         shell::xdg::{
             PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler,
@@ -42,11 +42,11 @@ use smithay::{
     },
 };
 use std::ffi::OsString;
+use std::mem::MaybeUninit;
 use std::sync::Arc;
 
 mod bridge;
 mod ddm;
-mod egl;
 mod java_types;
 mod output;
 mod process;
@@ -60,7 +60,6 @@ pub(crate) struct WaylandCraft<'a> {
     pub state: WLCState,
     pub event_loop: EventLoop<'a, WLCState>,
     pub bridge: BridgeState,
-    pub egl: EGLHelper,
     pub xdg: XDGSpecHelper,
 }
 
@@ -73,12 +72,13 @@ pub struct WLCState {
     pub viewporter_state: ViewporterState,
     pub single_pixel_buffer_state: SinglePixelBufferState,
     pub dmabuf_state: DmabufState,
-    pub dmabuf_global: DmabufGlobal,
+    pub dmabuf_global: MaybeUninit<DmabufGlobal>,
     pub requests: WindowRequests,
     pub seat: WLCSeatState,
     pub data: WLCDataState,
     pub output: WLCOutput,
     pub satellite: Option<SatelliteState>,
+    pub pending_dmabuf_imports: Vec<(Dmabuf, dmabuf::ImportNotifier)>,
 }
 
 #[derive(Default)]
@@ -92,8 +92,16 @@ pub struct WindowRequests {
     pub resize_interactive: Vec<(Serial, ResizeEdge)>,
 }
 
+pub struct DmabufFeedbackData {
+    device: dev_t,
+    formats: Vec<Format>,
+}
+
 impl WLCState {
-    fn new(disp: DisplayHandle, egl: &EGLHelper) -> Self {
+    fn new(
+        disp: DisplayHandle,
+        dmabuf_feedback: Option<DmabufFeedbackData>,
+    ) -> Self {
         let compositor_state = CompositorState::new::<WLCState>(&disp);
         let shm_state = ShmState::new::<WLCState>(&disp, vec![]);
         let xdg_state = XdgShellState::new::<WLCState>(&disp);
@@ -102,7 +110,15 @@ impl WLCState {
             SinglePixelBufferState::new::<WLCState>(&disp);
 
         let mut dmabuf_state = DmabufState::new();
-        let dmabuf_global = init_dmabuf(&disp, &mut dmabuf_state, egl);
+        let mut dmabuf_global = MaybeUninit::uninit();
+
+        if let Some(feedback) = dmabuf_feedback {
+            dmabuf_global.write(init_dmabuf(
+                &disp,
+                &mut dmabuf_state,
+                feedback,
+            ));
+        }
 
         let seat = WLCSeatState::new();
         seat.create_globals(&disp);
@@ -128,6 +144,7 @@ impl WLCState {
             data,
             output,
             satellite: None,
+            pending_dmabuf_imports: vec![],
         }
     }
 }
@@ -135,17 +152,12 @@ impl WLCState {
 fn init_dmabuf(
     disp: &DisplayHandle,
     state: &mut DmabufState,
-    egl: &EGLHelper,
+    feedback_data: DmabufFeedbackData,
 ) -> DmabufGlobal {
-    let render_node = egl
-        .get_render_node()
-        .expect("Failed to find any GPU render node (checked EGL device query extensions and /dev/dri)!");
-    let render_node_id = render_node.dev_id();
-    let formats = egl.query_dmabuf_formats();
-
-    let feedback = DmabufFeedbackBuilder::new(render_node_id, formats)
-        .build()
-        .unwrap();
+    let feedback =
+        DmabufFeedbackBuilder::new(feedback_data.device, feedback_data.formats)
+            .build()
+            .unwrap();
 
     state.create_global_with_default_feedback::<WLCState>(disp, &feedback)
 }
@@ -183,10 +195,10 @@ impl DmabufHandler for WLCState {
     fn dmabuf_imported(
         &mut self,
         _global: &DmabufGlobal,
-        _dmabuf: Dmabuf,
-        notifier: ImportNotifier,
+        dmabuf: Dmabuf,
+        notifier: dmabuf::ImportNotifier,
     ) {
-        let _ = notifier.successful::<WLCState>();
+        self.pending_dmabuf_imports.push((dmabuf, notifier));
     }
 }
 
@@ -290,13 +302,13 @@ impl ClientData for WLCClient {
 }
 
 pub(crate) fn wlc_init(
-    egl: EGLHelper,
+    dmabuf_feedback: Option<DmabufFeedbackData>,
 ) -> Result<WaylandCraft<'static>, Box<dyn std::error::Error>> {
     let event_loop: EventLoop<WLCState> = EventLoop::try_new()?;
     let display: Display<WLCState> = Display::new()?;
     let socket = ListeningSocketSource::new_auto()?;
 
-    let mut state = WLCState::new(display.handle(), &egl);
+    let mut state = WLCState::new(display.handle(), dmabuf_feedback);
     state.socket = socket.socket_name().to_os_string();
 
     let ev_handle = event_loop.handle();
@@ -336,7 +348,6 @@ pub(crate) fn wlc_init(
         state,
         event_loop,
         bridge: BridgeState::new(),
-        egl,
         xdg,
     };
     Ok(instance)

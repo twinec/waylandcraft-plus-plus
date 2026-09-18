@@ -1,18 +1,25 @@
 #![allow(non_snake_case)]
 
-use crate::egl::{EGLDisplay, EGLHelper};
+use crate::WLCState;
 use crate::java_types::*;
 use crate::utils::get_time;
 use crate::xdg_spec::RawDesktopEntry;
-use crate::{WaylandCraft, wlc_init};
+use crate::{DmabufFeedbackData, WaylandCraft, wlc_init};
 use jni::objects::{JIntArray, JLongArray, JObjectArray, JPrimitiveArray};
 use jni::{
     Env, bind_java_type,
-    objects::{JClass, JString},
+    objects::{JClass, JObject, JString},
     sys::{jboolean, jbyte, jdouble, jint, jlong},
 };
+use rustix::{fd::AsRawFd, fs::makedev};
 use smithay::{
-    backend::allocator::{Buffer, dmabuf::WeakDmabuf},
+    backend::{
+        allocator::{
+            Buffer, Format, Fourcc, Modifier,
+            dmabuf::{Dmabuf, WeakDmabuf},
+        },
+        drm::{CreateDrmNodeError, DrmNode},
+    },
     reexports::{
         wayland_protocols::xdg::shell::server::xdg_toplevel,
         wayland_server::{
@@ -28,8 +35,8 @@ use smithay::{
     utils::{Logical, Point, Size},
     wayland::{
         compositor::{
-            BufferAssignment, SubsurfaceCachedState, SurfaceAttributes,
-            SurfaceData, TraversalAction, with_states, Damage,
+            BufferAssignment, Damage, SubsurfaceCachedState, SurfaceAttributes,
+            SurfaceData, TraversalAction, with_states,
             with_states as with_surface_data, with_surface_tree_upward,
         },
         dmabuf::get_dmabuf,
@@ -94,15 +101,23 @@ bind_java_type! {
     type_map {
         WLCSurface => dev.evvie.waylandcraft.bridge.WLCSurface,
         JRawDesktopEntry => dev.evvie.waylandcraft.desktop.RawDesktopEntry,
+        JDmabufFormat => dev.evvie.waylandcraft.bridge.dmabuf.DmabufFormat,
+        JDmabufPlane => dev.evvie.waylandcraft.bridge.dmabuf.DmabufPlane,
+        JDmabuf => dev.evvie.waylandcraft.bridge.dmabuf.Dmabuf,
+        JDmabufFeedbackData =>
+            dev.evvie.waylandcraft.bridge.dmabuf.DmabufFeedbackData,
     },
 
     methods {
         fn get_or_create_surface(jlong) -> WLCSurface,
+        fn import_dmabuf(JDmabuf) -> jboolean,
     },
 
     native_methods {
         static extern fn init {
-            sig = (glfw_get_proc_address: jlong, egl_display: jlong) -> jlong,
+            sig = (
+                dmabuf_feedback: JDmabufFeedbackData,
+            ) -> jlong,
             fn = init,
         },
         static extern fn shutdown {
@@ -227,6 +242,10 @@ bind_java_type! {
         static extern fn dmabufs {
             sig = (instance: jlong) -> jlong[],
             fn = dmabufs
+        },
+        extern fn check_import_dmabuf {
+            sig = (instance: jlong),
+            fn = check_import_dmabuf,
         },
         extern fn update_surface_tree {
             sig = (instance: jlong, surface: WLCSurface) -> WLCSurface,
@@ -396,6 +415,14 @@ bind_java_type! {
             sig = (instance: jlong) -> jlong,
             fn = dnd_icon,
         },
+        static extern fn drm_device_by_path {
+            sig = (path: JString) -> jlong,
+            fn = drm_device_by_path,
+        },
+        static extern fn drm_device_by_major_minor {
+            sig = (major: jint, minor: jint) -> jlong,
+            fn = drm_device_by_major_minor,
+        },
     },
 }
 
@@ -427,6 +454,8 @@ enum BridgeError {
     NonPositiveWidth,
     #[error("Height cannot be below 1")]
     NonPositiveHeight,
+    #[error(transparent)]
+    DrmNodeError(#[from] CreateDrmNodeError),
 }
 
 macro_rules! jptr_to_instance {
@@ -466,19 +495,74 @@ macro_rules! jptr_to_popup {
 }
 
 fn init<'local>(
-    _env: &mut Env<'local>,
+    env: &mut Env<'local>,
     _class: JClass<'local>,
-    glfw_get_proc_address: jlong,
-    egl_display: jlong,
+    dmabuf_feedback: JDmabufFeedbackData<'local>,
 ) -> Result<jlong, BridgeError> {
-    let dpy: EGLDisplay = (egl_display as usize) as EGLDisplay;
-    let egl = EGLHelper::new(dpy, glfw_get_proc_address as usize);
-
-    let instance = wlc_init(egl).map_err(BridgeError::Init)?;
+    let dmabuf_feedback = dmabuf_feedback_from_java(env, dmabuf_feedback)?;
+    let instance = wlc_init(dmabuf_feedback).map_err(BridgeError::Init)?;
     let instance_box = Box::new(instance);
     let ptr = Box::into_raw(instance_box);
 
     Ok(ptr.addr() as jlong)
+}
+
+fn dmabuf_feedback_from_java<'local>(
+    env: &mut Env<'local>,
+    jfeedback: JDmabufFeedbackData<'local>,
+) -> Result<Option<DmabufFeedbackData>, BridgeError> {
+    if jfeedback.is_null() {
+        return Ok(None);
+    }
+
+    let device = jfeedback.drm_device(env)? as libc::dev_t;
+    let formats = jfeedback.formats(env)?;
+    let formats = JObjectArray::<JDmabufFormat>::cast_local(env, formats)?;
+    let formats = formats_from_java(env, formats)?;
+    Ok(Some(DmabufFeedbackData { device, formats }))
+}
+
+fn drm_device_by_path<'local>(
+    env: &mut Env<'local>,
+    _class: JClass<'local>,
+    path: JString<'local>,
+) -> Result<jlong, BridgeError> {
+    let path = path.try_to_string(env)?;
+    let node = DrmNode::from_path(path)?;
+    Ok(node.dev_id() as jlong)
+}
+
+fn drm_device_by_major_minor<'local>(
+    _env: &mut Env<'local>,
+    _class: JClass<'local>,
+    major: jint,
+    minor: jint,
+) -> Result<jlong, BridgeError> {
+    let id = makedev(major as u32, minor as u32);
+    let node = DrmNode::from_dev_id(id)?;
+    Ok(node.dev_id() as jlong)
+}
+
+fn formats_from_java<'local>(
+    env: &mut Env<'local>,
+    jformats: JObjectArray<'local, JDmabufFormat<'local>>,
+) -> Result<Vec<Format>, BridgeError> {
+    let mut formats: Vec<Format> = vec![];
+    let len = jformats.len(env)?;
+    for idx in 0..len {
+        let jformat = jformats.get_element(env, idx)? as JDmabufFormat;
+        let code = jformat.code(env)? as u32;
+        let code = match Fourcc::try_from(code) {
+            Ok(f) => f,
+            Err(_) => continue,
+        };
+        let modifier = jformat.modifier(env)? as u64;
+        let modifier = Modifier::from(modifier);
+
+        formats.push(Format { code, modifier });
+    }
+
+    Ok(formats)
 }
 
 fn shutdown<'local>(
@@ -502,7 +586,8 @@ fn dispatch_clients<'local>(
     instance: jlong,
 ) -> Result<(), BridgeError> {
     let instance = jptr_to_instance!(instance, "dispatchClients")?;
-    instance.event_loop
+    instance
+        .event_loop
         .dispatch(Some(Duration::ZERO), &mut instance.state)
         .unwrap();
 
@@ -543,8 +628,7 @@ fn x11_display<'local>(
     let instance = jptr_to_instance!(instance, "x11Display")?;
     if let Some(ref s) = instance.state.satellite {
         Ok(JString::new(env, s.get_display())?)
-    }
-    else {
+    } else {
         Ok(JString::null())
     }
 }
@@ -576,8 +660,9 @@ where
         vec.push(Box::new(elem.clone()));
     }
 
-    let ptr: &mut T = vec.iter_mut().find(|r| ***r == *elem).unwrap();
-    ((ptr as *mut T) as usize) as jlong
+    let ptr: &mut Box<T> = vec.iter_mut().find(|r| ***r == *elem).unwrap();
+    let ptr: *mut T = &raw mut **ptr;
+    (ptr as usize) as jlong
 }
 
 // Get an element and return its handle
@@ -588,6 +673,15 @@ where
 {
     let ptr: &T = vec.iter().find(|r| ***r == *elem).unwrap();
     ((ptr as *const T) as usize) as jlong
+}
+
+// Get an element and return its handle
+fn get_handle_safe<T>(vec: &[Box<T>], elem: &T) -> Option<jlong>
+where
+    T: Clone + PartialEq,
+{
+    let ptr: Option<&T> = vec.iter().find(|r| ***r == *elem).map(|v| &**v);
+    ptr.map(|p| ((p as *const T) as usize) as jlong)
 }
 
 // Insert all elements that aren't in the list already
@@ -782,8 +876,10 @@ fn resize_request<'local>(
     Ok(array)
 }
 
+#[derive(PartialEq)]
 enum BufferAttachResult {
     Success,
+    TryAgain,
     Error,
     NotManaged,
 }
@@ -862,24 +958,91 @@ fn try_attach_dmabuf(
     ensure_viewport_valid(surf_data, Size::new(width, height));
 
     let weak = dmabuf.weak();
-    let handle = insert_get_handle(&mut instance.bridge.dmabufs, &weak);
-
-    let already_attached = jsurface.attach_dmabuf(env, handle).unwrap();
-
-    if already_attached {
-        return BufferAttachResult::Success;
-    }
-
-    let image = match instance.egl.dmabuf_to_image(dmabuf) {
-        Ok(img) => img,
-        Err(_) => return BufferAttachResult::Error,
+    let handle = match get_handle_safe(&mut instance.bridge.dmabufs, &weak) {
+        Some(h) => h,
+        None => {
+            // Client attempted to attach unknown dmabuf
+            // This can happen when a new dmabuf has been created but hasn't
+            // finished importing yet
+            return BufferAttachResult::TryAgain;
+        }
     };
 
-    jsurface
-        .attach_new_dmabuf(env, handle, image.addr() as jlong, width, height)
-        .unwrap();
+    if jsurface.attach_dmabuf(env, handle).unwrap() {
+        BufferAttachResult::Success
+    } else {
+        BufferAttachResult::Error
+    }
+}
 
-    BufferAttachResult::Success
+fn check_import_dmabuf<'local>(
+    env: &mut Env<'local>,
+    this: WaylandCraftBridge<'local>,
+    instance: jlong,
+) -> Result<(), BridgeError> {
+    let instance = jptr_to_instance!(instance, "check_import_dmabuf")?;
+    let (dmabuf, notif) = match instance.state.pending_dmabuf_imports.pop() {
+        Some(t) => t,
+        None => return Ok(()),
+    };
+
+    let mut ref_box = Box::new(dmabuf.weak());
+    let handle: *mut WeakDmabuf = &raw mut *ref_box;
+    let handle = (handle as usize) as jlong;
+
+    let jdmabuf = dmabuf_to_java(env, &dmabuf, handle)?;
+    let success = this.import_dmabuf(env, jdmabuf)?;
+
+    if !success {
+        notif.failed();
+        return Ok(());
+    }
+
+    match notif.successful::<WLCState>() {
+        Ok(_) => {}
+        Err(_) => return Ok(()),
+    };
+
+    instance.bridge.dmabufs.push(ref_box);
+    Ok(())
+}
+
+fn dmabuf_to_java<'local>(
+    env: &mut Env<'local>,
+    dmabuf: &Dmabuf,
+    dmabuf_handle: jlong,
+) -> Result<JDmabuf<'local>, BridgeError> {
+    let array = JObjectArray::<JDmabufPlane>::new(
+        env,
+        dmabuf.num_planes(),
+        JDmabufPlane::null(),
+    )?;
+
+    let mut handles = dmabuf.handles();
+    let mut offsets = dmabuf.offsets();
+    let mut strides = dmabuf.strides();
+
+    for idx in 0..dmabuf.num_planes() {
+        let handle = handles.next().unwrap().as_raw_fd();
+        let offset = offsets.next().unwrap();
+        let stride = strides.next().unwrap();
+        let plane =
+            JDmabufPlane::new(env, handle, offset as jint, stride as jint)?;
+        array.set_element(env, idx, plane)?;
+    }
+
+    let array = JObjectArray::<JObject>::cast_local(env, array)?;
+    let jdmabuf = JDmabuf::new(
+        env,
+        dmabuf_handle,
+        dmabuf.width() as jint,
+        dmabuf.height() as jint,
+        (dmabuf.format().code as u32) as jint,
+        u64::from(dmabuf.format().modifier) as jlong,
+        array,
+    )?;
+
+    Ok(jdmabuf)
 }
 
 fn dmabufs<'local>(
@@ -903,7 +1066,7 @@ fn try_attach_buffer(
     jsurface: &WLCSurface,
     buf: &WlBuffer,
     surf_data: &SurfaceData,
-) -> Result<(), ()> {
+) -> BufferAttachResult {
     type TryAttachFn = fn(
         instance: &mut WaylandCraft,
         env: &mut Env,
@@ -918,8 +1081,7 @@ fn try_attach_buffer(
         let result = func(instance, env, jsurface, buf, surf_data);
         match result {
             BufferAttachResult::NotManaged => continue,
-            BufferAttachResult::Success => return Ok(()),
-            BufferAttachResult::Error => return Err(()),
+            a => return a,
         }
     }
 
@@ -954,17 +1116,19 @@ fn update_surface_data<'local>(
 
         if let Some(buf) = maybe_buf {
             let r = try_attach_buffer(instance, env, &jsurface, buf, data);
-            if r.is_err() {
+            if r == BufferAttachResult::Error {
                 eprintln!("Buffer attach failed!");
                 remove_buf = true;
             }
 
             // Done with buffer attachment
             // All buffers are immediately released because at this point they
-            // are all already written to an independent OpenGL texture.
+            // are all already written to an independent GPU texture.
             // (including the dmabufs)
-            buf.release();
-            attr.buffer = None;
+            if r != BufferAttachResult::TryAgain {
+                buf.release();
+                attr.buffer = None;
+            }
         }
 
         if remove_buf {
@@ -990,23 +1154,19 @@ fn update_surface_data<'local>(
         for damage in &attr.damage {
             match damage {
                 Damage::Surface(d) => {
-                    jsurface.add_surface_damage(
-                        env,
-                        d.loc.x,
-                        d.loc.y,
-                        d.size.w,
-                        d.size.h
-                    ).unwrap();
-                },
+                    jsurface
+                        .add_surface_damage(
+                            env, d.loc.x, d.loc.y, d.size.w, d.size.h,
+                        )
+                        .unwrap();
+                }
                 Damage::Buffer(d) => {
-                    jsurface.add_buffer_damage(
-                        env,
-                        d.loc.x,
-                        d.loc.y,
-                        d.size.w,
-                        d.size.h
-                    ).unwrap();
-                },
+                    jsurface
+                        .add_buffer_damage(
+                            env, d.loc.x, d.loc.y, d.size.w, d.size.h,
+                        )
+                        .unwrap();
+                }
             }
         }
         attr.damage.clear();
@@ -1899,7 +2059,10 @@ fn exec_app<'local>(
         ("QT_QPA_PLATFORM".into(), "wayland".into()),
         ("ELECTRON_OZONE_PLATFORM_HINT".into(), "auto".into()),
         ("GDK_BACKEND".into(), "wayland".into()),
-        ("DBUS_SESSION_BUS_ADDRESS".into(), "unix:path=/dev/null".into()),
+        (
+            "DBUS_SESSION_BUS_ADDRESS".into(),
+            "unix:path=/dev/null".into(),
+        ),
     ];
     if let Some(ref s) = instance.state.satellite {
         env_vars.push(("DISPLAY".into(), s.get_display().into()));
