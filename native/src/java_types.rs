@@ -40,15 +40,76 @@ bind_java_type! {
             alpha: jbyte
         ),
         pub fn attach_dmabuf(handle: jlong) -> jboolean,
-        pub fn attach_new_dmabuf(
-            dmabuf_handle: jlong,
-            egl_image_ptr: jlong,
-            width: jint,
-            height: jint
-        ),
         pub fn clear_damage(),
         pub fn add_buffer_damage(x: jint, y: jint, width: jint, height: jint),
         pub fn add_surface_damage(x: jint, y: jint, width: jint, height: jint),
+    },
+}
+
+bind_java_type! {
+    rust_type = JDmabufFormat,
+    rust_type_vis = pub,
+    java_type = dev.evvie.waylandcraft.bridge.dmabuf.DmabufFormat,
+
+    constructors {
+        fn new(
+            code: jint,
+            modifier: jlong
+        )
+    },
+
+    fields {
+        code: jint,
+        modifier: jlong
+    },
+}
+
+bind_java_type! {
+    rust_type = JDmabufPlane,
+    rust_type_vis = pub,
+    java_type = dev.evvie.waylandcraft.bridge.dmabuf.DmabufPlane,
+
+    constructors {
+        fn new(
+            fd: jint,
+            offset: jint,
+            stride: jint
+        )
+    },
+}
+
+bind_java_type! {
+    rust_type = JDmabuf,
+    rust_type_vis = pub,
+    java_type = dev.evvie.waylandcraft.bridge.dmabuf.Dmabuf,
+
+    constructors {
+        fn new(
+            handle: jlong,
+            width: jint,
+            height: jint,
+            format: jint,
+            modifier: jlong,
+            planes: dev.evvie.waylandcraft.bridge.dmabuf.DmabufPlane[]
+        )
+    },
+}
+
+bind_java_type! {
+    rust_type = JDmabufFeedbackData,
+    rust_type_vis = pub,
+    java_type = dev.evvie.waylandcraft.bridge.dmabuf.DmabufFeedbackData,
+
+    constructors {
+        fn new(
+            drm_device: jlong,
+            formats: dev.evvie.waylandcraft.bridge.dmabuf.DmabufFormat[],
+        )
+    },
+
+    fields {
+        drm_device: jlong,
+        formats: dev.evvie.waylandcraft.bridge.dmabuf.DmabufFormat[],
     },
 }
 
