@@ -6,6 +6,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Map;
 
 import com.google.gson.Gson;
 
@@ -21,7 +22,6 @@ public class WaylandCraftSettingsManager {
 	private File settingsDir;
 	private File keymapFile;
 	private File settingsFile;
-	private File envOverridesFile;
 	
 	private ArrayList<SettingResponder> responders = new ArrayList<SettingResponder>();
 	
@@ -85,55 +85,37 @@ public class WaylandCraftSettingsManager {
 		}
 	}
 	
-	private static final String ENV_OVERRIDES_TEMPLATE =
-			"# WaylandCraft exec_app environment variable overrides.\n" +
-			"#\n" +
-			"# One KEY=VALUE per line, applied when launching apps via the app\n" +
-			"# launcher. An override replaces the matching default listed below;\n" +
-			"# anything else you add is passed through as-is. Lines starting with\n" +
-			"# '#' are ignored. Changes take effect next time the game (re)connects\n" +
-			"# to the compositor -- no rebuild of the native code needed.\n" +
-			"#\n" +
-			"# Defaults baked into WaylandCraft, uncomment and edit to override:\n" +
-			"#QT_QPA_PLATFORM=wayland\n" +
-			"#ELECTRON_OZONE_PLATFORM_HINT=auto\n" +
-			"#GDK_BACKEND=wayland\n" +
-			"#DBUS_SESSION_BUS_ADDRESS=unix:path=/dev/null\n" +
-			"#\n" +
-			"# WAYLAND_DISPLAY and DISPLAY are computed at runtime; you can still\n" +
-			"# override them below, but it's rarely useful.\n";
-	
+	// Env vars passed to launched apps live in settings.json (WaylandCraftSettings#envOverrides)
+	// alongside every other setting, rather than a separate file. Push the current
+	// map down to native whenever it changes or on (re)connect.
 	public void loadEnvOverrides() {
-		/* Read env var override config, creating a documented template on first run */
-		envOverridesFile = new File(settingsDir, "env.txt");
-	
-		if(!envOverridesFile.exists()) {
-			try(FileWriter writer = new FileWriter(envOverridesFile)) {
-				writer.write(ENV_OVERRIDES_TEMPLATE);
-			} catch(IOException e) {
-				WaylandCraftCommon.LOGGER.error("Failed to write default env.txt!", e);
-			}
-		}
-	
-		String overrides = tryReadEnvOverridesFromFile();
-		if(overrides != null) {
-			wlc.bridge.setEnvOverrides(overrides);
-		}
+		applyEnvOverrides();
 	}
 	
-	private String tryReadEnvOverridesFromFile() {
-		if(!(envOverridesFile.exists() && envOverridesFile.isFile())) return null;
-	
-		try {
-			FileInputStream stream = new FileInputStream(envOverridesFile);
-			byte[] data = stream.readAllBytes();
-			String overrides = new String(data);
-			stream.close();
-			return overrides;
-		} catch(IOException e) {
-			WaylandCraftCommon.LOGGER.info("Error reading env overrides file!", e);
-			return null;
+	private void applyEnvOverrides() {
+		StringBuilder blob = new StringBuilder();
+		for(Map.Entry<String, String> entry : wlc.settings.getEnvOverrides().entrySet()) {
+			blob.append(entry.getKey()).append('=').append(entry.getValue()).append('\n');
 		}
+		wlc.bridge.setEnvOverrides(blob.toString());
+	}
+	
+	public Map<String, String> getEnvOverrides() {
+		return wlc.settings.getEnvOverrides();
+	}
+	
+	// Set (or add) a single env var override, write it to file, and push it to native
+	public void setEnvOverride(String key, String value) {
+		wlc.settings.getEnvOverrides().put(key, value);
+		writeSettings();
+		applyEnvOverrides();
+	}
+	
+	// Remove a single env var override, write the change to file, and push it to native
+	public void removeEnvOverride(String key) {
+		wlc.settings.getEnvOverrides().remove(key);
+		writeSettings();
+		applyEnvOverrides();
 	}
 	
 	private String tryReadKeymapFromSystem() {
