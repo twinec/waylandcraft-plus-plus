@@ -189,46 +189,11 @@ public class WaylandCraft implements ClientModInitializer {
 		displays.forEach((d) -> d.render(ctx));
 	}
 	
-	public void updateWorld(LevelExtractionContext ctx) {
-		for(WLCPopup popup : bridge.getMappedPopups()) {
-			WLCAbstractWindow root = popup;
-			while((root = ((WLCPopup) root).getParent()) instanceof WLCPopup);
-			
-			WLCToplevel toplevel = (WLCToplevel) root;
-			boolean toplevelHasWindow = hasDisplayFor(toplevel);
-			boolean popupHasWindow = hasDisplayFor(popup);
-			if(toplevelHasWindow && !popupHasWindow) {
-				getOrCreateDisplay(popup);
-			}
-			else if(!toplevelHasWindow && popupHasWindow) {
-				displays.removeIf((w) -> w.window == popup);
-			}
-		}
-		
-		displays.removeIf((d) -> !d.isValid());
-		displays.forEach((d) -> d.updateGeometry());
-		
-		for(WLCPopup popup : bridge.getMappedPopups()) {
-			anchorToParent(popup);
-		}
-		
-		updateDisplayRequests();
-		
-		itemManager.giveItemsIfMissing(bridge.getNewToplevels());
-		
-		boolean inWMScreen = Minecraft.getInstance().gui.screen() instanceof WindowManagerScreen;
-		
-		// Make sure the toplevels are focused in their respective order and being refocused when a toplevel disappears
-		if(!inWMScreen) {
-			WLCToplevel focus = bridge.getMostToLeastRecentFocus()
-					.filter((t) -> hasDisplayFor(t))
-					.findFirst()
-					.orElse(null);
-			
-			bridge.focusSurface(focus);
-		}
-		
-		Camera camera = ctx.camera();
+	// called in the pick() method of MinecraftMixin
+	public void updatePointer() {
+		if(bridge == null) return;
+
+		Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
 		processPointerMotion(camera);
 		
 		if(Minecraft.getInstance().player == null || !Minecraft.getInstance().player.isUsingItem()) playerUsingWindowItem = false;
@@ -251,6 +216,51 @@ public class WaylandCraft implements ClientModInitializer {
 			else playerUsingWindowItem = false;
 		}
 		playerWasUsingWindowItem = playerUsingWindowItem;
+	}
+	
+	public void updateWorld(LevelExtractionContext ctx) {
+		for(WLCPopup popup : bridge.getMappedPopups()) {
+			WLCAbstractWindow root = popup;
+			while((root = ((WLCPopup) root).getParent()) instanceof WLCPopup);
+			
+			WLCToplevel toplevel = (WLCToplevel) root;
+			boolean toplevelHasWindow = hasDisplayFor(toplevel);
+			boolean popupHasWindow = hasDisplayFor(popup);
+			if(toplevelHasWindow && !popupHasWindow) {
+				getOrCreateDisplay(popup);
+			}
+			else if(!toplevelHasWindow && popupHasWindow) {
+				displays.removeIf((w) -> w.window == popup);
+			}
+		}
+		
+		displays.removeIf((d) -> !d.isValid());
+		displays.forEach((d) -> d.updateGeometry());
+		
+		for(WLCPopup popup : bridge.getMappedPopups()) {
+			anchorToParent(popup);
+		}
+	}
+	
+	public void onClientTick(Minecraft minecraft) {
+		if(minecraft.player == null) return;
+		checkKeybinds(minecraft);
+		
+		updateDisplayRequests();
+		
+		itemManager.giveItemsIfMissing(bridge.getNewToplevels());
+		
+		boolean inWMScreen = Minecraft.getInstance().gui.screen() instanceof WindowManagerScreen;
+		
+		// Make sure the toplevels are focused in their respective order and being refocused when a toplevel disappears
+		if(!inWMScreen) {
+			WLCToplevel focus = bridge.getMostToLeastRecentFocus()
+					.filter((t) -> hasDisplayFor(t))
+					.findFirst()
+					.orElse(null);
+			
+			bridge.focusSurface(focus);
+		}
 		
 		updateOutputSize(inWMScreen);
 	}
@@ -272,11 +282,6 @@ public class WaylandCraft implements ClientModInitializer {
 		keyboardCaptureMode = KeyboardCaptureMode.NONE;
 		bridge.deactivateKeyboard();
 		disablePointerCapture();
-	}
-	
-	public void onClientTick(Minecraft minecraft) {
-		if(minecraft.player == null) return;
-		checkKeybinds(minecraft);
 	}
 		
 	private void checkKeybinds(Minecraft minecraft) {
