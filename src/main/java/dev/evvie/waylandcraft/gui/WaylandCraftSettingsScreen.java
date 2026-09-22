@@ -91,6 +91,7 @@ public class WaylandCraftSettingsScreen extends Screen {
 		createBooleanSettingsWidget(WaylandCraftSettings.FOCUS_ON_HOVER, Component.literal("Focus windows when hovered"));
 		createTextSettingsWidget(WaylandCraftSettings.TERMINAL_CHOICE, Component.literal("Default terminal"));
 		createEnvOverridesSettingsWidget(Component.literal("Env var overrides (KEY=VALUE;KEY2=VALUE2)"));
+		createBooleanSettingsWidget(WaylandCraftSettings.DETACH_CURSOR, Component.literal("Detach cursor in capture mode"));
 	}
 	
 }
