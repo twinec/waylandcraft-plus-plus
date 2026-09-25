@@ -67,19 +67,27 @@ dependencies {
 // Remove before merging.
 tasks.register("findMovedApis") {
 	doLast {
-		def needles = ["FrameBufferCache.class"]
-		def substrings = ["Uniform", "renderpearl"]
+		println "=== full compileClasspath (${sourceSets.main.compileClasspath.files.size()} entries) ==="
+		sourceSets.main.compileClasspath.files.each { println "  ${it.name}" }
 		sourceSets.main.compileClasspath.files.each { jarFile ->
-			if (!jarFile.name.contains("minecraft-merged")) return
+			if (!jarFile.name.endsWith(".jar")) return
 			try {
 				def zip = new java.util.zip.ZipFile(jarFile)
-				def hits = zip.entries().findAll { e ->
-					needles.any { n -> e.name.endsWith(n) } ||
-					substrings.any { s -> e.name.contains(s) }
-				}
+				def hits = zip.entries().findAll { e -> e.name.endsWith("GLFW.class") || e.name.contains("glfw") }
 				if (hits) {
-					println "=== ${jarFile.name} (${hits.size()} matches) ==="
+					println "=== ${jarFile.name} (${hits.size()} glfw matches) ==="
 					hits.sort { it.name }.each { println "  ${it.name}" }
+				}
+				if (jarFile.name.contains("minecraft-merged")) {
+					def uniformStorage = zip.entries().findAll { e ->
+						e.name.startsWith("net/minecraft/client/renderer/") &&
+						!e.name.substring("net/minecraft/client/renderer/".length()).contains("/") &&
+						(e.name.contains("Buffer") || e.name.contains("Storage") || e.name.contains("Uniform"))
+					}
+					if (uniformStorage) {
+						println "=== net/minecraft/client/renderer/ Buffer|Storage|Uniform top-level (${uniformStorage.size()}) ==="
+						uniformStorage.sort { it.name }.each { println "  ${it.name}" }
+					}
 				}
 				zip.close()
 			} catch (Exception e) {
