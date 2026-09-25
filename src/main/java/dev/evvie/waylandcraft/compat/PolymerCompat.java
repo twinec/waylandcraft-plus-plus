@@ -3,7 +3,6 @@ package dev.evvie.waylandcraft.compat;
 import eu.pb4.polymer.common.api.PolymerCommonUtils;
 import eu.pb4.polymer.core.api.item.PolymerItem;
 import eu.pb4.polymer.core.api.utils.PolymerClientDecoded;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.context.PacketContext;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.HolderLookup;
@@ -16,7 +15,7 @@ import net.minecraft.world.item.Items;
 import dev.evvie.waylandcraft.WaylandCraftCommon;
 import dev.evvie.waylandcraft.item.WindowHandle;
 import dev.evvie.waylandcraft.item.WindowItem;
-import dev.evvie.waylandcraft.network.ClientboundHelloPayload;
+import dev.evvie.waylandcraft.network.WaylandCraftPresence;
 
 /**
  * Registers WaylandCraft's items as Polymer overlays, using
@@ -95,13 +94,17 @@ public class PolymerCompat {
 			if(!hasWaylandCraft(context)) WindowHandle.strip(out);
 		}
 
-		// Detects whether the connecting player has WaylandCraft installed,
-		// via the mod's own networking channel being registered on their
-		// connection -- players who do should see and interact with the
-		// real item/data, not the vanilla-safe fallback.
+		// Detects whether the connecting player has WaylandCraft installed.
+		// Backed by WaylandCraftPresence, which checks channel registration
+		// during the CONFIGURATION phase rather than with a live
+		// ServerPlayNetworking#canSend() check here -- a PLAY-phase check
+		// raced the server's very first PLAY packets (like the initial
+		// inventory sync), incorrectly reporting players as not having
+		// WaylandCraft installed. See project memory:
+		// container-set-content-decode-crash.
 		private static boolean hasWaylandCraft(PacketContext context) {
 			ServerPlayer player = PolymerCommonUtils.getPlayer(context);
-			return player != null && ServerPlayNetworking.canSend(player, ClientboundHelloPayload.TYPE);
+			return player != null && WaylandCraftPresence.has(player.getUUID());
 		}
 
 	}
