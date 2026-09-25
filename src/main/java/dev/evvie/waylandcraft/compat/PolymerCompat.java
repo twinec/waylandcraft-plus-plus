@@ -3,9 +3,11 @@ package dev.evvie.waylandcraft.compat;
 import eu.pb4.polymer.common.api.PolymerCommonUtils;
 import eu.pb4.polymer.core.api.item.PolymerItem;
 import eu.pb4.polymer.core.api.utils.PolymerClientDecoded;
+import eu.pb4.polymer.core.api.utils.PolymerSyncedObject;
 import net.fabricmc.fabric.api.networking.v1.context.PacketContext;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
@@ -48,7 +50,20 @@ public class PolymerCompat {
 			ResourcePackHook.addAssets();
 		}
 
-		PolymerItem.registerOverlay(WindowItem.WINDOW, new WindowItemPolymerOverlay());
+		// Not PolymerItem.registerOverlay(...) -- that also calls
+		// RegistrySyncUtils.setServerEntry(), which moves WINDOW to the tail
+		// of the server's item registry at freeze time. That reorder is only
+		// ever communicated to clients over Polymer's own networking
+		// handshake, which real WaylandCraft clients don't speak (we use our
+		// own CONFIGURATION-phase handshake, see WaylandCraftPresence) --
+		// so a real client sent the true item id has no matching entry in
+		// its own registry, decode throws "No value with id N". Registering
+		// only the plain synced-object overlay keeps the disguise-on-encode
+		// behavior (that's independent of setServerEntry) without moving
+		// WINDOW's id, so ordinary fabric-registry-sync-v0 keeps informing
+		// every client of its real, unmoved id like any other modded item.
+		// See project memory: container-set-content-decode-crash.
+		PolymerSyncedObject.setPlainSyncedObject(BuiltInRegistries.ITEM, WindowItem.WINDOW, new WindowItemPolymerOverlay());
 	}
 
 	// Isolated in its own class so merely loading PolymerCompat doesn't
