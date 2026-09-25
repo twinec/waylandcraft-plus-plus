@@ -78,13 +78,19 @@ public class WaylandCraftSettingsScreen extends Screen {
 		SettingsWidget widget = SettingsWidget.createTextWidget(wlc, settingName, message);
 		settingsWidgets.add(widget);
 	}
-	
+
+	public void createEnvOverridesSettingsWidget(Component message) {
+		SettingsWidget widget = SettingsWidget.createEnvOverridesWidget(wlc, message);
+		settingsWidgets.add(widget);
+	}
+
 	private void createSettings() {
 		settingsWidgets.clear();
-		
+
 		createIntSettingsWidget(WaylandCraftSettings.PIXELS_PER_BLOCK, Component.literal("Window display pixels per block"));
 		createBooleanSettingsWidget(WaylandCraftSettings.FOCUS_ON_HOVER, Component.literal("Focus windows when hovered"));
 		createTextSettingsWidget(WaylandCraftSettings.TERMINAL_CHOICE, Component.literal("Default terminal"));
+		createEnvOverridesSettingsWidget(Component.literal("Env var overrides (KEY=VALUE;KEY2=VALUE2)"));
 		createBooleanSettingsWidget(WaylandCraftSettings.DETACH_CURSOR, Component.literal("Detach cursor in capture mode"));
 	}
 	

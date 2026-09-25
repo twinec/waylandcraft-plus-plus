@@ -51,7 +51,12 @@ public class SettingsWidget extends AbstractWidget {
 		TextControlElement control = new TextControlElement(instance, settingName);
 		return new SettingsWidget(instance, control, message);
 	}
-	
+
+	public static SettingsWidget createEnvOverridesWidget(WaylandCraft instance, Component message) {
+		EnvOverridesControlElement control = new EnvOverridesControlElement(instance);
+		return new SettingsWidget(instance, control, message);
+	}
+
 	@Override
 	protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a) {
 		Font font = Minecraft.getInstance().font;
@@ -348,18 +353,18 @@ public class SettingsWidget extends AbstractWidget {
 	}
 	
 	public static class TextControlElement extends ControlElement {
-		
-		private EditBox editBox;
-		
+
+		protected EditBox editBox;
+
 		public TextControlElement(WaylandCraft wlc, String settingName) {
 			super(wlc, settingName);
-			
+
 			editBox = new EditBox(Minecraft.getInstance().font, getWidth(), getHeight(), Component.literal(settingName));
 			editBox.insertText(getSavedValue());
 			editBox.moveCursorTo(0, false);
 		}
-		
-		private String getSavedValue() {
+
+		protected String getSavedValue() {
 			return wlc.settingsManager.getTextSetting(settingName);
 		}
 		
@@ -415,7 +420,30 @@ public class SettingsWidget extends AbstractWidget {
 		public boolean onCharTyped(CharacterEvent event) {
 			return editBox.charTyped(event);
 		}
-		
+
 	}
-	
+
+	// A single-line text box editing the whole env var override set at once, as
+	// "KEY=VALUE;KEY2=VALUE2" (see WaylandCraftSettingsManager#getEnvOverridesText).
+	// Not backed by a single named setting, unlike TextControlElement, so it
+	// overrides where that reads/writes its value rather than being constructed
+	// with a settingName that maps to a real field.
+	public static class EnvOverridesControlElement extends TextControlElement {
+
+		public EnvOverridesControlElement(WaylandCraft wlc) {
+			super(wlc, "envOverrides");
+		}
+
+		@Override
+		protected String getSavedValue() {
+			return wlc.settingsManager.getEnvOverridesText();
+		}
+
+		@Override
+		public void saveValue() {
+			wlc.settingsManager.setEnvOverridesText(editBox.getValue());
+		}
+
+	}
+
 }

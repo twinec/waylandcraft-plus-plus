@@ -5,6 +5,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -150,22 +151,55 @@ public class WaylandCraftBridge {
 		}
 		
 		String renderNodePath = EGLHelper.queryRenderNodePath(eglDisplay);
-		if(renderNodePath == null) {
-			WaylandCraftCommon.LOGGER.error("Failed to query for drm render node! This could indicate a software renderer. Disabling dmabuf functionality.");
+		DmabufFormat[] formats = EGLHelper.queryDmabufFormats(eglDisplay).toArray(DmabufFormat[]::new);
+
+		Long device = openRenderNode(renderNodePath);
+		if(device == null) {
+			WaylandCraftCommon.LOGGER.error("Failed to get a render node; dmabuf-based window rendering will be disabled");
 			return null;
 		}
-		
-		DmabufFormat[] formats = EGLHelper.queryDmabufFormats(eglDisplay).toArray(DmabufFormat[]::new);
-		long drmDevice = drmDeviceByPath(renderNodePath);
-		return new DmabufFeedbackData(drmDevice, formats);
+
+		return new DmabufFeedbackData(device, formats);
 	}
-	
+
+	// EGL_EXT_device_query/EGL_EXT_device_base (used by EGLHelper.queryRenderNodePath) are known
+	// to get clobbered when an overlay like MangoHud is loaded into the process, which used to
+	// crash the game outright. Fall back to scanning /dev/dri directly for a render node when the
+	// EGL path comes back empty or doesn't resolve to a usable device.
+	private static Long openRenderNode(String renderNodePath) {
+		if(renderNodePath != null) {
+			try {
+				return drmDeviceByPath(renderNodePath);
+			} catch(Throwable e) {
+				WaylandCraftCommon.LOGGER.error("Querying the render node via EGL failed ({}), falling back to scanning /dev/dri", e.getMessage());
+			}
+		}
+		else {
+			WaylandCraftCommon.LOGGER.error("Failed to query render node path via EGL (this could indicate a software renderer), falling back to scanning /dev/dri");
+		}
+
+		File[] candidates = new File("/dev/dri").listFiles((dir, name) -> name.startsWith("renderD"));
+		if(candidates == null) {
+			return null;
+		}
+
+		Arrays.sort(candidates);
+		for(File candidate : candidates) {
+			try {
+				return drmDeviceByPath(candidate.getPath());
+			} catch(Throwable e) {
+				// Try the next candidate
+			}
+		}
+
+		return null;
+	}
+
 	private static DmabufFeedbackData initBackendVulkan() {
 		VulkanDevice device = VulkanHelper.getVulkanDevice();
 		DrmNodeId id = VulkanHelper.getRenderNodeId(device);
 		long drmDevice = drmDeviceByMajorMinor(id.major(), id.minor());
 		DmabufFormat[] formats = VulkanHelper.queryDmabufFormats(device).toArray(DmabufFormat[]::new);
-//		return null; // Disable DMABUF for now
 		return new DmabufFeedbackData(drmDevice, formats);
 	}
 	
@@ -721,7 +755,11 @@ public class WaylandCraftBridge {
 	public void setPreferredTerminal(String cmd) {
 		setPreferredTerminal(instance, cmd);
 	}
-	
+
+	public void setEnvOverrides(String overrides) {
+		setEnvOverrides(instance, overrides);
+	}
+
 	public void setKeymapDefault() {
 		setKeymapDefault(instance);
 	}
@@ -898,6 +936,7 @@ public class WaylandCraftBridge {
 	
 	private static native boolean execApp(long instance, String appId);
 	private static native void setPreferredTerminal(long instance, String cmd);
+	private static native void setEnvOverrides(long instance, String overrides);
 	
 	private static native void setKeymapDefault(long instance);
 	private static native String exportKeymap(long instance);

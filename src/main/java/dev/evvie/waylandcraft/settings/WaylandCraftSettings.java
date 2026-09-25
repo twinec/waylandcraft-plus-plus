@@ -1,6 +1,8 @@
 package dev.evvie.waylandcraft.settings;
 
 import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -22,7 +24,16 @@ public class WaylandCraftSettings {
 	boolean focusOnHover = false;
 	String terminalChoice = "";
 	boolean detachCursor = false;
-	
+
+	/* Environment variables passed to launched apps (see XDGSpecHelper#exec_app's
+	 * defaults, natively), keyed by name. An entry here overrides the matching
+	 * native default, or is passed through as a brand new variable if it doesn't
+	 * match one. Not one of the SETTINGS below since it isn't a single scalar
+	 * value editable through a SettingsWidget row -- see WaylandCraftSettingsManager
+	 * for how it's applied.
+	 */
+	Map<String, String> envOverrides = new HashMap<String, String>();
+
 	/* This is where the field names go to avoid typos */
 	public static final String PIXELS_PER_BLOCK = "pixelsPerBlock";
 	public static final String FOCUS_ON_HOVER = "focusOnHover";
@@ -49,7 +60,11 @@ public class WaylandCraftSettings {
 	public String getTerminalChoice() {
 		return terminalChoice;
 	}
-	
+
+	public Map<String, String> getEnvOverrides() {
+		return envOverrides;
+	}
+
 	public boolean getDetachCursor() {
 		return detachCursor;
 	}
