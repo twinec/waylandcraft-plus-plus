@@ -1,0 +1,50 @@
+plugins {
+	id 'java'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+	archivesName = "waylandcraft-paper"
+}
+
+repositories {
+	mavenCentral()
+	maven {
+		name = "PaperMC"
+		url = "https://repo.papermc.io/repository/maven-public/"
+	}
+}
+
+dependencies {
+	// Paper API only, compileOnly -- the server itself provides the
+	// implementation at runtime. Version tracks minecraft_version the
+	// same way the root project's Fabric dependencies do (see root
+	// gradle.properties); double check this actually resolves to a real
+	// published Paper API artifact for this Minecraft version before
+	// relying on it.
+	compileOnly "io.papermc.paper:paper-api:${project.minecraft_version}-R0.1-SNAPSHOT"
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+processResources {
+	inputs.property "version", project.version
+
+	filesMatching("plugin.yml") {
+		expand "version": inputs.properties.version
+	}
+}
+
+jar {
+	inputs.property "archivesName", project.base.archivesName
+	version = null
+}
