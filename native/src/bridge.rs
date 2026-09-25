@@ -11,12 +11,12 @@ use jni::{
     objects::{JClass, JObject, JString},
     sys::{jboolean, jbyte, jdouble, jint, jlong},
 };
-use rustix::{fd::AsRawFd, fs::makedev};
+use rustix::{fd::IntoRawFd, fs::{makedev, fstat}};
 use smithay::{
     backend::{
         allocator::{
             Buffer, Format, Fourcc, Modifier,
-            dmabuf::{Dmabuf, WeakDmabuf},
+            dmabuf::{Dmabuf, DmabufSyncFlags, WeakDmabuf},
         },
         drm::{CreateDrmNodeError, DrmNode},
     },
@@ -63,6 +63,7 @@ pub(crate) struct BridgeState {
     popups: Vec<Box<PopupSurface>>,
     surfaces: Vec<Box<WlSurface>>,
     dmabufs: Vec<Box<WeakDmabuf>>,
+    pending_release: Vec<Box<WlBuffer>>,
 }
 
 impl BridgeState {
@@ -72,6 +73,7 @@ impl BridgeState {
             popups: vec![],
             surfaces: vec![],
             dmabufs: vec![],
+            pending_release: vec![],
         }
     }
 }
@@ -246,6 +248,14 @@ bind_java_type! {
         extern fn check_import_dmabuf {
             sig = (instance: jlong),
             fn = check_import_dmabuf,
+        },
+        static extern fn release_buffer {
+            sig = (instance: jlong, release_handle: jlong),
+            fn = release_buffer,
+        },
+        static extern fn sync_dmabuf_planes {
+            sig = (instance: jlong, handle: jlong, end: jboolean),
+            fn = sync_dmabuf_planes,
         },
         extern fn update_surface_tree {
             sig = (instance: jlong, surface: WLCSurface) -> WLCSurface,
@@ -511,9 +521,7 @@ fn dmabuf_feedback_from_java<'local>(
     env: &mut Env<'local>,
     jfeedback: JDmabufFeedbackData<'local>,
 ) -> Result<Option<DmabufFeedbackData>, BridgeError> {
-    if jfeedback.is_null() {
-        return Ok(None);
-    }
+    if jfeedback.is_null() { return Ok(None) }
 
     let device = jfeedback.drm_device(env)? as libc::dev_t;
     let formats = jfeedback.formats(env)?;
@@ -716,6 +724,27 @@ where
     vec.retain(|e| **e != *elem);
 }
 
+fn pop_element<T>(vec: &mut Vec<Box<T>>, handle: jlong) -> Box<T>
+where
+    T: Clone + PartialEq,
+{
+    let ptr: *mut T = (handle as usize) as *mut T;
+    let elem: &mut T = unsafe { &mut *ptr };
+    let idx = vec.iter().position(|b| **b == *elem).unwrap();
+    vec.swap_remove(idx)
+}
+
+// Get handles of all elements in the list
+fn get_element_by_handle<T>(vec: &mut [Box<T>], ptr: jlong) -> Option<&mut T>
+where
+    T: Clone + PartialEq,
+{
+    vec.iter_mut()
+        .map(|r| (&mut **r) as *mut T)
+        .find(|p| *p == (ptr as usize) as *mut T)
+        .map(|p| unsafe { &mut *p })
+}
+
 fn toplevels<'local>(
     env: &mut Env<'local>,
     _class: JClass<'local>,
@@ -879,6 +908,7 @@ fn resize_request<'local>(
 #[derive(PartialEq)]
 enum BufferAttachResult {
     Success,
+    WaitRelease,
     TryAgain,
     Error,
     NotManaged,
@@ -961,18 +991,66 @@ fn try_attach_dmabuf(
     let handle = match get_handle_safe(&mut instance.bridge.dmabufs, &weak) {
         Some(h) => h,
         None => {
-            // Client attempted to attach unknown dmabuf
-            // This can happen when a new dmabuf has been created but hasn't
-            // finished importing yet
+            eprintln!("Client attempted to attach unknown dmabuf!");
             return BufferAttachResult::TryAgain;
-        }
+        },
     };
 
-    if jsurface.attach_dmabuf(env, handle).unwrap() {
-        BufferAttachResult::Success
+    let release_handle =
+        insert_get_handle(&mut instance.bridge.pending_release, buf);
+
+    if jsurface.attach_dmabuf(env, handle, release_handle).unwrap() {
+        BufferAttachResult::WaitRelease
+        //BufferAttachResult::Success
     } else {
         BufferAttachResult::Error
     }
+}
+
+fn sync_dmabuf_planes<'local>(
+    _env: &mut Env<'local>,
+    _class: JClass<'local>,
+    instance: jlong,
+    handle: jlong,
+    end: jboolean,
+) -> Result<(), BridgeError> {
+    let instance = jptr_to_instance!(instance, "sync_dmabuf_planes")?;
+    let dmabuf: Option<Dmabuf> = get_element_by_handle(
+        &mut instance.bridge.dmabufs,
+        handle
+    ).and_then(|d| d.upgrade());
+
+    let dmabuf = match dmabuf {
+        Some(d) => d,
+        None => {
+            eprintln!("DMABUF gone :(");
+            return Ok(());
+        }
+    };
+
+    let mut flags = DmabufSyncFlags::READ;
+    match end {
+        false => flags |= DmabufSyncFlags::START,
+        true => flags |= DmabufSyncFlags::END,
+    }
+
+    for idx in 0..dmabuf.num_planes() {
+        dmabuf.sync_plane(idx, flags).expect("dmabuf plane sync");
+    }
+
+    Ok(())
+}
+
+fn release_buffer<'local>(
+    _env: &mut Env<'local>,
+    _class: JClass<'local>,
+    instance: jlong,
+    handle: jlong,
+) -> Result<(), BridgeError> {
+    let instance = jptr_to_instance!(instance, "release_buffer")?;
+    let buffer = pop_element(&mut instance.bridge.pending_release, handle);
+    buffer.release();
+    Ok(())
 }
 
 fn check_import_dmabuf<'local>(
@@ -983,7 +1061,7 @@ fn check_import_dmabuf<'local>(
     let instance = jptr_to_instance!(instance, "check_import_dmabuf")?;
     let (dmabuf, notif) = match instance.state.pending_dmabuf_imports.pop() {
         Some(t) => t,
-        None => return Ok(()),
+        None => { return Ok(()) }
     };
 
     let mut ref_box = Box::new(dmabuf.weak());
@@ -999,8 +1077,8 @@ fn check_import_dmabuf<'local>(
     }
 
     match notif.successful::<WLCState>() {
-        Ok(_) => {}
-        Err(_) => return Ok(()),
+        Ok(_) => {},
+        Err(_) => { return Ok(()) },
     };
 
     instance.bridge.dmabufs.push(ref_box);
@@ -1023,11 +1101,29 @@ fn dmabuf_to_java<'local>(
     let mut strides = dmabuf.strides();
 
     for idx in 0..dmabuf.num_planes() {
-        let handle = handles.next().unwrap().as_raw_fd();
+        let handle = handles.next().unwrap();
         let offset = offsets.next().unwrap();
         let stride = strides.next().unwrap();
-        let plane =
-            JDmabufPlane::new(env, handle, offset as jint, stride as jint)?;
+
+        // Find the size of the plane allocation via fstat
+        let size = fstat(handle)
+            .expect("Failed to fstat dmabuf plane!")
+            .st_size;
+
+        // Clone file descriptor and use IntoRawFd to make a new file
+        // descriptor pointing to the same data while making sure that Rust does
+        // not close the fd beforehand
+        let handle = handle.try_clone_to_owned()
+            .expect("Cloning dmabuf plane fd")
+            .into_raw_fd();
+
+        let plane = JDmabufPlane::new(
+            env,
+            handle,
+            size,
+            offset as jint,
+            stride as jint
+        )?;
         array.set_element(env, idx, plane)?;
     }
 
@@ -1123,10 +1219,12 @@ fn update_surface_data<'local>(
 
             // Done with buffer attachment
             // All buffers are immediately released because at this point they
-            // are all already written to an independent GPU texture.
-            // (including the dmabufs)
+            // are all already written to an independent GPU texture
+            // (excluding dmabufs)
             if r != BufferAttachResult::TryAgain {
-                buf.release();
+                if r != BufferAttachResult::WaitRelease {
+                    buf.release();
+                }
                 attr.buffer = None;
             }
         }
@@ -2098,8 +2196,8 @@ fn set_preferred_terminal<'local>(
 }
 
 // `overrides` is a simple "KEY=VALUE" per-line blob (blank lines and lines
-// starting with '#' are ignored), matching the env.txt file format read by
-// WaylandCraftSettingsManager#loadEnvOverrides.
+// starting with '#' are ignored), matching the format written by
+// WaylandCraftSettingsManager#applyEnvOverrides.
 fn set_env_overrides<'local>(
     env: &mut Env<'local>,
     _class: JClass<'local>,

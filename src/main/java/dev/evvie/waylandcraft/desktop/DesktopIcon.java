@@ -8,10 +8,10 @@ import java.nio.ByteBuffer;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.lwjgl.system.MemoryUtil;
 
+import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.GpuFormat;
 
 import dev.evvie.waylandcraft.WaylandCraft;
 import dev.evvie.waylandcraft.WaylandCraftCommon;

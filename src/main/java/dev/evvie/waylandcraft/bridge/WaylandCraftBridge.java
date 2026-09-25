@@ -18,6 +18,7 @@ import org.lwjgl.system.Platform;
 import com.mojang.blaze3d.opengl.GlDevice;
 import com.mojang.blaze3d.systems.GpuDeviceBackend;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vulkan.VulkanDevice;
 
 import dev.evvie.waylandcraft.WaylandCraftCommon;
 import dev.evvie.waylandcraft.bridge.WLCAbstractWindow.SurfaceGeometry;
@@ -32,6 +33,8 @@ import dev.evvie.waylandcraft.render.BufferTexture.DmabufImportFailedException;
 import dev.evvie.waylandcraft.render.BufferTexture.DmabufTexture;
 import dev.evvie.waylandcraft.render.WindowFramebuffer;
 import dev.evvie.waylandcraft.utils.CursorShape;
+import dev.evvie.waylandcraft.vulkan.VulkanHelper;
+import dev.evvie.waylandcraft.vulkan.VulkanHelper.DrmNodeId;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
 
@@ -133,6 +136,9 @@ public class WaylandCraftBridge {
 		if(deviceBackend instanceof GlDevice) {
 			return initBackendEGL();
 		}
+		else if(deviceBackend instanceof VulkanDevice) {
+			return initBackendVulkan();
+		}
 		
 		WaylandCraftCommon.LOGGER.error("Unsupported graphics backend!");
 		return null;
@@ -143,7 +149,7 @@ public class WaylandCraftBridge {
 		if(eglDisplay == 0) {
 			throw new RuntimeException("Failed to get EGL display!");
 		}
-
+		
 		String renderNodePath = EGLHelper.queryRenderNodePath(eglDisplay);
 		DmabufFormat[] formats = EGLHelper.queryDmabufFormats(eglDisplay).toArray(DmabufFormat[]::new);
 
@@ -187,6 +193,14 @@ public class WaylandCraftBridge {
 		}
 
 		return null;
+	}
+
+	private static DmabufFeedbackData initBackendVulkan() {
+		VulkanDevice device = VulkanHelper.getVulkanDevice();
+		DrmNodeId id = VulkanHelper.getRenderNodeId(device);
+		long drmDevice = drmDeviceByMajorMinor(id.major(), id.minor());
+		DmabufFormat[] formats = VulkanHelper.queryDmabufFormats(device).toArray(DmabufFormat[]::new);
+		return new DmabufFeedbackData(drmDevice, formats);
 	}
 	
 	private void shutdownHook() {
@@ -741,11 +755,11 @@ public class WaylandCraftBridge {
 	public void setPreferredTerminal(String cmd) {
 		setPreferredTerminal(instance, cmd);
 	}
-	
+
 	public void setEnvOverrides(String overrides) {
 		setEnvOverrides(instance, overrides);
 	}
-	
+
 	public void setKeymapDefault() {
 		setKeymapDefault(instance);
 	}
@@ -775,6 +789,18 @@ public class WaylandCraftBridge {
 	public void sendDndMotion(WLCSurface surface, double x, double y) {
 		long handle = surface == null ? 0 : surface.getHandle();
 		dndMotion(instance, handle, x, y);
+	}
+	
+	public void syncStartDmabufRead(long dmabuf) {
+		syncDmabufPlanes(instance, dmabuf, false);
+	}
+	
+	public void syncEndDmabufRead(long dmabuf) {
+		syncDmabufPlanes(instance, dmabuf, true);
+	}
+	
+	public void sendBufferRelease(long releaseHandle) {
+		releaseBuffer(instance, releaseHandle);
 	}
 	
 	public static record Size(int width, int height) {}
@@ -840,6 +866,10 @@ public class WaylandCraftBridge {
 	
 	// Check if there are new dmabufs waiting to be imported. If yes, importDmabuf() will be called
 	private native void checkImportDmabuf(long instance);
+	
+	private static native void syncDmabufPlanes(long instance, long dmabuf, boolean end);
+	
+	private static native void releaseBuffer(long instance, long handle);
 	
 	// Updates the surface tree given by the root surface
 	// This changes the doubly linked list of the WLCSurfaces.

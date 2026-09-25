@@ -19,7 +19,6 @@ import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.ColorTargetState;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.TextureTarget;
-import com.mojang.blaze3d.platform.BlendFactor;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -47,72 +46,48 @@ import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.Identifier;
 
 public class WindowFramebuffer implements FramebufferRenderable {
-
-	private static final BindGroupLayout WINDOW_SAMPLER_LAYOUT = BindGroupLayout.builder()
-		.withSampler("Sampler0")
-		.build();
-	private static final BindGroupLayout WINDOW_INFO_LAYOUT = BindGroupLayout.builder()
-		.withUniform("WindowInfo", UniformType.UNIFORM_BUFFER)
-		.build();
-
+	
 	public static final RenderPipeline WINDOW_PIPELINE = RenderPipelines.register(
 		RenderPipeline.builder()
 		.withLocation(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "pipeline/window"))
 		.withVertexShader(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "window"))
 		.withFragmentShader(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "window"))
+		.withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+		.withBindGroupLayout(BindGroupLayout.builder().withUniform("WindowInfo", UniformType.UNIFORM_BUFFER).build())
+		.withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA))
 		.withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
 		.withPrimitiveTopology(PrimitiveTopology.QUADS)
-		.withBindGroupLayout(WINDOW_SAMPLER_LAYOUT)
-		.withBindGroupLayout(WINDOW_INFO_LAYOUT)
-		.withColorTargetState(new ColorTargetState(new BlendFunction(BlendFactor.ONE, BlendFactor.ONE_MINUS_SRC_ALPHA)))
 		.withCull(false)
 		.build()
 	);
-
+	
 	public static final RenderPipeline UNPREMULTIPLY_PIPELINE = RenderPipelines.register(
 		RenderPipeline.builder()
 		.withLocation(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "pipeline/unpremultiply"))
 		.withVertexShader("core/screenquad")
 		.withFragmentShader(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "unpremultiply"))
-		.withPrimitiveTopology(PrimitiveTopology.TRIANGLES)
+		.withBindGroupLayout(BindGroupLayouts.SAMPLER0)
 		.withColorTargetState(ColorTargetState.DEFAULT)
-		.withBindGroupLayout(BindGroupLayouts.GLOBALS)
-		.withBindGroupLayout(WINDOW_SAMPLER_LAYOUT)
-		.withCull(false)
+		.withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
+		.withPrimitiveTopology(PrimitiveTopology.TRIANGLES)
 		.build()
 	);
-
+	
 	public static final RenderPipeline DAMAGE_PIPELINE = RenderPipelines.register(
 		RenderPipeline.builder()
 		.withLocation(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "pipeline/damage"))
 		.withVertexShader(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "window"))
 		.withFragmentShader(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "window_damage"))
+		.withBindGroupLayout(BindGroupLayout.builder().withUniform("WindowInfo", UniformType.UNIFORM_BUFFER).build())
+		.withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA))
 		.withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
 		.withPrimitiveTopology(PrimitiveTopology.QUADS)
-		.withBindGroupLayout(WINDOW_INFO_LAYOUT)
-		.withColorTargetState(new ColorTargetState(new BlendFunction(BlendFactor.ONE, BlendFactor.ONE_MINUS_SRC_ALPHA)))
 		.withCull(false)
 		.build()
 	);
 	
 	private static DynamicUniformStorage<WindowInfoUniform> uniformStorage = null;
 	private static boolean debugDamage = false;
-	private static boolean pipelinesPrecompiled = false;
-
-	// Custom RenderPipelines can compile lazily on first use; our manual,
-	// low-level createRenderPass calls don't wait for that, so a pipeline
-	// that isn't ready yet can silently produce no fragments on its first
-	// few draws. Force eager compilation the first time we actually have a
-	// GPU device (Window/RenderSystem must already exist by the time any
-	// window is rendered).
-	private static void ensurePipelinesCompiled() {
-		if(pipelinesPrecompiled) return;
-		pipelinesPrecompiled = true;
-
-		RenderSystem.getDevice().precompilePipeline(WINDOW_PIPELINE);
-		RenderSystem.getDevice().precompilePipeline(UNPREMULTIPLY_PIPELINE);
-		RenderSystem.getDevice().precompilePipeline(DAMAGE_PIPELINE);
-	}
 	
 	public final WLCSurface surfaceTree;
 	private TextureTarget tempTarget = null;
@@ -175,7 +150,7 @@ public class WindowFramebuffer implements FramebufferRenderable {
 		if(tempTarget == null) {
 			tempTarget = new TextureTarget(name() + "-temp", width, height, false, GpuFormat.RGBA8_UNORM);
 		}
-
+		
 		if(target == null) {
 			target = new TextureTarget(name(), width, height, false, GpuFormat.RGBA8_UNORM);
 		}
@@ -188,8 +163,6 @@ public class WindowFramebuffer implements FramebufferRenderable {
 	}
 	
 	public void render() {
-		ensurePipelinesCompiled();
-
 		updateTarget();
 		if(target == null || tempTarget == null) return;
 		
@@ -224,12 +197,11 @@ public class WindowFramebuffer implements FramebufferRenderable {
 				element.vertexBuffer.close();
 			}
 		}
-
+		
 		if(debugDamage) drawDebugDamage(opaqueUniforms);
-
+		
 		try(RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "window framebuffer unpremultiply", target.getColorTextureView(), Optional.empty())) {
 			pass.setPipeline(UNPREMULTIPLY_PIPELINE);
-			RenderSystem.bindDefaultUniforms(pass);
 			pass.bindTexture("Sampler0", tempTarget.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
 			pass.draw(3, 1, 0, 0);
 		}
@@ -283,7 +255,7 @@ public class WindowFramebuffer implements FramebufferRenderable {
 			crop_x2 = (float) ((src.x() + src.width()) / buf.width);
 			crop_y2 = (float) ((src.y() + src.height()) / buf.height);
 		}
-
+		
 		return new BufferDraw(buf.getTextureView(), x, y, w, h, crop_x1, crop_y1, crop_x2, crop_y2, buf.format != BufferTexture.FORMAT_XRGB8888);
 	}
 	

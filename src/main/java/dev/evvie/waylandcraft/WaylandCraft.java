@@ -29,7 +29,6 @@ import dev.evvie.waylandcraft.grabs.DNDGrab;
 import dev.evvie.waylandcraft.grabs.MoveGrab;
 import dev.evvie.waylandcraft.grabs.PointerGrabMap;
 import dev.evvie.waylandcraft.grabs.PointerGrabMap.ImplicitGrab;
-import dev.evvie.waylandcraft.gpu.EglAvailability;
 import dev.evvie.waylandcraft.grabs.ResizeGrab;
 import dev.evvie.waylandcraft.gui.AppLauncherScreen;
 import dev.evvie.waylandcraft.gui.WaylandHudRenderer;
@@ -51,6 +50,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import dev.evvie.waylandcraft.network.ClientboundHelloPayload;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
@@ -142,15 +142,9 @@ public class WaylandCraft implements ClientModInitializer {
 			WaylandCraft.fallbackMode = true;
 			return;
 		}
-
-		// Must run before the game window is created (which is why this
-		// happens here, in mod init, rather than lazily) — GlBackendMixin
-		// reads the cached result to decide whether it's safe to force EGL
-		// context creation for the OpenGL backend.
-		EglAvailability.probe();
-
+		
 		LevelRenderEvents.COLLECT_SUBMITS.register(this::renderWorld);
-		LevelRenderEvents.END_EXTRACTION.register(this::updateWorld);
+		LevelExtractionEvents.END_EXTRACTION.register(this::updateWorld);
 		ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
 		ClientPlayConnectionEvents.JOIN.register(this::onClientJoin);
 		ClientPlayConnectionEvents.DISCONNECT.register(this::onClientDisconnect);
@@ -176,7 +170,7 @@ public class WaylandCraft implements ClientModInitializer {
 			registerSettingsResponders();
 			settingsManager.loadKeymap();
 			settingsManager.loadEnvOverrides();
-			
+
 			WaylandCraftCommon.LOGGER.info("Wayland server started on " + waylandSocket);
 			WaylandCraftCommon.LOGGER.info("Xwayland started on " + x11Display);
 		}
@@ -198,24 +192,26 @@ public class WaylandCraft implements ClientModInitializer {
 	// called in the pick() method of MinecraftMixin
 	public void updatePointer() {
 		if(bridge == null) return;
-
+		
 		Camera camera = Minecraft.getInstance().gameRenderer.mainCamera();
 		processPointerMotion(camera);
 		
 		if(Minecraft.getInstance().player == null || !Minecraft.getInstance().player.isUsingItem()) playerUsingWindowItem = false;
 		if(playerUsingWindowItem) {
 			ItemStack item = Minecraft.getInstance().player.getUseItem();
-			WLCToplevel toplevel = getToplevel(item);
-
-			if(toplevel != null) {
-				WindowDisplay display = getOrCreateDisplay(toplevel);
-				if(!playerWasUsingWindowItem) {
-					display.anchorDistance = 2.0;
+			if(item.is(WindowItem.WINDOW)) {
+				WLCToplevel toplevel = getToplevel(item);
+				
+				if(toplevel != null) {
+					WindowDisplay display = getOrCreateDisplay(toplevel);
+					if(!playerWasUsingWindowItem) {
+						display.anchorDistance = 2.0;
+					}
+					
+					display.doGrabMove(camera.position(), new Vec3(camera.forwardVector()), new Vec3(camera.upVector()), camera.yRot());
+					
+					WaylandCraft.instance.bridge.focusSurface(toplevel);
 				}
-
-				display.doGrabMove(camera.position(), new Vec3(camera.forwardVector()), new Vec3(camera.upVector()), camera.yRot());
-
-				WaylandCraft.instance.bridge.focusSurface(toplevel);
 			}
 			else playerUsingWindowItem = false;
 		}
@@ -292,10 +288,10 @@ public class WaylandCraft implements ClientModInitializer {
 		if(keyOpenScreen.consumeClick()) {
 			disableKeyboardCapture();
 			pointerGrabs.releaseAll();
-			minecraft.gui.setScreen(new WindowManagerScreen(WaylandCraft.instance));
+			minecraft.setScreenAndShow(new WindowManagerScreen(WaylandCraft.instance));
 		}
 		else if(keyOpenAppLauncher.consumeClick()) {
-			minecraft.gui.setScreen(new AppLauncherScreen(WaylandCraft.instance));
+			minecraft.setScreenAndShow(new AppLauncherScreen(WaylandCraft.instance));
 		}
 		else if(keyCaptureKeyboard.consumeClick()) {
 			enableKeyboardCapture(false);
@@ -318,7 +314,7 @@ public class WaylandCraft implements ClientModInitializer {
 		if(item == null) return null;
 		if(WaylandCraft.instance.bridge == null) return null;
 		
-		WindowHandle data = item.get(WindowItem.WINDOW_HANDLE);
+		WindowHandle data = WindowHandle.from(item);
 		if(data == null) return null;
 		if(!data.matchesPlayer(Minecraft.getInstance().player)) return null;
 		
@@ -326,7 +322,7 @@ public class WaylandCraft implements ClientModInitializer {
 	}
 	
 	private void addWindowItemTooltip(ItemStack itemStack, TooltipContext ctx, TooltipFlag flag, List<Component> list) {
-		WindowHandle handle = itemStack.get(WindowItem.WINDOW_HANDLE);
+		WindowHandle handle = WindowHandle.from(itemStack);
 		if(handle != null) {
 			String text = "Handle 0x" + Long.toHexString(handle.handle());
 			Component component = Component

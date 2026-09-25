@@ -39,24 +39,24 @@ public class WaylandCraftSettings {
 	public static final String FOCUS_ON_HOVER = "focusOnHover";
 	public static final String TERMINAL_CHOICE = "terminalChoice";
 	public static final String DETACH_CURSOR = "detachCursor";
-
+	
 	public static final String[] SETTINGS = new String[] {
 			PIXELS_PER_BLOCK,
 			FOCUS_ON_HOVER,
 			TERMINAL_CHOICE,
 			DETACH_CURSOR
 	};
-
+	
 	/* This is where the getters go */
-
+	
 	public int getPixelsPerBlock() {
 		return pixelsPerBlock;
 	}
-
+	
 	public boolean getFocusOnHover() {
 		return focusOnHover;
 	}
-
+	
 	public String getTerminalChoice() {
 		return terminalChoice;
 	}
@@ -64,7 +64,7 @@ public class WaylandCraftSettings {
 	public Map<String, String> getEnvOverrides() {
 		return envOverrides;
 	}
-	
+
 	public boolean getDetachCursor() {
 		return detachCursor;
 	}

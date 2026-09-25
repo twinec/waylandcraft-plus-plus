@@ -31,7 +31,7 @@ public class TitleScreenMixin extends Screen {
 		List<AbstractWidget> row = IconRowUtils.findIconRow(this.children());
 
 		SpriteIconButton button = SpriteIconButton
-				.builder(Component.literal("waylandcraft"), (_) -> {Minecraft.getInstance().gui.setScreen(new WaylandCraftSettingsScreen(WaylandCraft.instance));}, true)
+				.builder(Component.literal("waylandcraft"), (_) -> {Minecraft.getInstance().setScreenAndShow(new WaylandCraftSettingsScreen(WaylandCraft.instance));}, true)
 				.sprite(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "logo"), 16, 16)
 				.width(IconRowUtils.ICON_ROW_BUTTON_WIDTH)
 				.build();

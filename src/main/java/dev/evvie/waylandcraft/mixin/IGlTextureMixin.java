@@ -9,10 +9,10 @@ import com.mojang.blaze3d.opengl.GlTexture;
 
 @Mixin(GlTexture.class)
 public interface IGlTextureMixin {
-
+	
 	@Invoker("<init>")
-	static GlTexture createTexture(int usage, String string, GpuFormat gpuFormat, int width, int height, int depthOrLayers, int mipLevels, int id, FrameBufferCache frameBufferCache) {
+	static GlTexture createTexture(int usage, String string, GpuFormat textureFormat, int width, int height, int depthOrLayers, int mipLevels, int id, FrameBufferCache fbCache) {
 		throw new AssertionError();
 	}
-
+	
 }

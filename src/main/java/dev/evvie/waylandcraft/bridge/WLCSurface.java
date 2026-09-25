@@ -5,6 +5,8 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+
 import dev.evvie.waylandcraft.WaylandCraft;
 import dev.evvie.waylandcraft.render.BufferTexture;
 import dev.evvie.waylandcraft.render.BufferTexture.DmabufTexture;
@@ -95,7 +97,7 @@ public class WLCSurface {
 	// Attach an already known dmabuf
 	// The surface width and height are reset to the given buffer dimensions.
 	// Returns false if no DmabufTexture by that handle was found.
-	protected boolean attachDmabuf(long handle) {
+	protected boolean attachDmabuf(long handle, long releaseHandle) {
 		removeBuffer();
 		
 		DmabufTexture dmabuf = WaylandCraft.instance.bridge.getDmabuf(handle);
@@ -106,6 +108,11 @@ public class WLCSurface {
 		this.height = buffer.height;
 		
 		dmabuf.copyData();
+		
+		RenderSystem.queueFencedTask(() -> {
+			WaylandCraft.instance.bridge.sendBufferRelease(releaseHandle);
+		});
+		
 		return true;
 	}
 	
@@ -146,15 +153,24 @@ public class WLCSurface {
 		double sw = width;
 		double sh = height;
 		
+		double sourceWidth;
+		double sourceHeight;
+		
 		if(sourceView != null) {
+			sourceWidth = sourceView.width;
+			sourceHeight = sourceView.height;
 			sx -= sourceView.x;
 			sy -= sourceView.y;
 		}
+		else {
+			sourceWidth = buffer.width;
+			sourceHeight = buffer.height;
+		}
 		
-		sx *= this.width / buffer.width;
-		sy *= this.height / buffer.height;
-		sw *= this.width / buffer.width;
-		sh *= this.height / buffer.height;
+		sx *= this.width / sourceWidth;
+		sy *= this.height / sourceHeight;
+		sw *= this.width / sourceWidth;
+		sh *= this.height / sourceHeight;
 		
 		addSurfaceDamage(Mth.floor(sx), Mth.floor(sy), Mth.ceil(sw), Mth.ceil(sh));
 	}

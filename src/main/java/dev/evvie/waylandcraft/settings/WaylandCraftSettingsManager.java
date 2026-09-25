@@ -91,7 +91,7 @@ public class WaylandCraftSettingsManager {
 	public void loadEnvOverrides() {
 		applyEnvOverrides();
 	}
-	
+
 	private void applyEnvOverrides() {
 		StringBuilder blob = new StringBuilder();
 		for(Map.Entry<String, String> entry : wlc.settings.getEnvOverrides().entrySet()) {
@@ -99,7 +99,7 @@ public class WaylandCraftSettingsManager {
 		}
 		wlc.bridge.setEnvOverrides(blob.toString());
 	}
-	
+
 	// Single-line settings-screen text box representation of the env override map,
 	// e.g. "QT_QPA_PLATFORM=wayland;DBUS_SESSION_BUS_ADDRESS=unix:path=/dev/null"
 	public String getEnvOverridesText() {
@@ -110,27 +110,27 @@ public class WaylandCraftSettingsManager {
 		}
 		return text.toString();
 	}
-	
+
 	// Replaces the whole env override map from a settings-screen text box value,
 	// writes it to file, and pushes it to native
 	public void setEnvOverridesText(String text) {
 		Map<String, String> overrides = wlc.settings.getEnvOverrides();
 		overrides.clear();
-		
+
 		for(String pair : text.split(";")) {
 			pair = pair.trim();
 			if(pair.isEmpty()) continue;
-			
+
 			int eq = pair.indexOf('=');
 			if(eq < 0) continue;
-			
+
 			overrides.put(pair.substring(0, eq).trim(), pair.substring(eq + 1).trim());
 		}
-		
+
 		writeSettings();
 		applyEnvOverrides();
 	}
-	
+
 	private String tryReadKeymapFromSystem() {
 		// Try running xkbcli to get keymap
 		String keymap = null;

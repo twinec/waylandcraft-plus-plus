@@ -18,7 +18,7 @@ import net.minecraft.client.gui.Hud;
 import net.minecraft.resources.Identifier;
 
 @Mixin(Hud.class)
-public class GuiMixin {
+public class HudMixin {
 	
 	private static final Identifier TLBR_DIAGONAL_CROSSHAIR = Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "crosshair/tlbr_diagonal");
 	private static final Identifier TRBL_DIAGONAL_CROSSHAIR = Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "crosshair/trbl_diagonal");

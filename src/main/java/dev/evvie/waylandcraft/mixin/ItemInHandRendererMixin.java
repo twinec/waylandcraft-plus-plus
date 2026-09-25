@@ -10,6 +10,7 @@ import com.llamalad7.mixinextras.sugar.ref.LocalRef;
 import com.mojang.blaze3d.vertex.PoseStack;
 
 import dev.evvie.waylandcraft.WaylandCraft;
+import dev.evvie.waylandcraft.item.WindowItem;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.ItemInHandRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
@@ -21,7 +22,7 @@ import net.minecraft.world.item.ItemStack;
 public abstract class ItemInHandRendererMixin {
 	
 	@Inject(method = "submitArmWithItem", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;pushPose()V"), cancellable = true)
-	public void renderArmWithItem(
+	public void submitArmWithItem(
 		AbstractClientPlayer player,
 		float partialTicks,
 		float yaw,
@@ -35,6 +36,7 @@ public abstract class ItemInHandRendererMixin {
 		CallbackInfo info,
 		@Local LocalRef<HumanoidArm> humanoidArmRef
 	) {
+		if(!itemStack.is(WindowItem.WINDOW)) return;
 		if(WaylandCraft.getToplevel(itemStack) == null) return;
 		
 		info.cancel();
