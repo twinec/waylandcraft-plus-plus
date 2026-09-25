@@ -336,16 +336,18 @@ public abstract class BufferTexture {
 			
 			GlTexture glTexture = IGlTextureMixin.createTexture(GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, "eglimage-" + this.hashCode(), GpuFormat.RGBA8_UINT, width, height, 1, 1, eglImageTex, ((GlDevice) RenderSystem.getDevice().backend).frameBufferCache());
 			internalTexture = glTexture;
+			internalView = RenderSystem.getDevice().createTextureView(internalTexture);
 		}
-		
+
 		@Override
 		public void doFree() {
 			if(internalTexture == null) return;
-			
+
 			long dpy = EGL.getEGLDisplay();
 			EGL.eglDestroyImage(dpy, eglImage);
-			
+
 			GlStateManager._deleteTexture(eglImageTex);
+			internalView.close();
 			internalTexture = null;
 		}
 		
