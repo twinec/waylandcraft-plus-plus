@@ -19,16 +19,12 @@ import org.jetbrains.annotations.Nullable;
  * only WaylandCraft -- causing "No value with id N" decode failures for
  * *any* item once the ordinals disagree. CUSTOM_DATA is a fixed vanilla
  * registry entry present at the same id everywhere, so it can't drift.
- * This also happens to be the exact format the companion Paper plugin
- * (paper-plugin/) already writes via Bukkit's PersistentDataContainer,
- * since Paper can't register a custom DataComponentType at all -- so
- * Fabric and Paper servers now produce identical wire data.
  */
 public record WindowHandle(UUID player, long handle) {
 
-	private static final String VALUES_COMPOUND = "PublicBukkitValues";
-	private static final String PLAYER_KEY = "waylandcraft:player";
-	private static final String HANDLE_KEY = "waylandcraft:handle";
+	private static final String VALUES_COMPOUND = "WaylandCraftWindowHandle";
+	private static final String PLAYER_KEY = "player";
+	private static final String HANDLE_KEY = "handle";
 
 	public static WindowHandle forPlayer(Player player, long handle) {
 		return new WindowHandle(getPlayerUUID(player), handle);

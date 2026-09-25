@@ -19,8 +19,7 @@
 		"IGpuDeviceMixin",
 		"FramerateLimitTrackerMixin",
 		"TitleScreenMixin",
-		"PauseScreenMixin",
-		"MultiPlayerGameModeMixin"
+		"PauseScreenMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
