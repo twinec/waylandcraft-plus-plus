@@ -127,13 +127,8 @@ jobs:
         distribution: 'temurin'
     - name: Setup gradle
       uses: gradle/actions/setup-gradle@v6
-    # paper-plugin/ is intentionally excluded here: its Paper API
-    # dependency (see paper-plugin/build.gradle) isn't published for
-    # this fork's Minecraft version yet, so it can't resolve. It stays
-    # in the repo as unbuilt, experimental/untested source until a
-    # matching Paper API artifact exists -- build root project only.
     - name: Build java code
-      run: ./gradlew :build
+      run: ./gradlew build
 
     # Publicly, verifiably ties this exact jar to this exact commit/workflow
     # run via Sigstore -- checkable with `gh attestation verify <jar> -R <repo>`.
