@@ -23,6 +23,7 @@ public class WaylandCraftSettings {
 	int pixelsPerBlock = 500;
 	boolean focusOnHover = false;
 	String terminalChoice = "";
+	boolean detachCursor = false;
 
 	/* Environment variables passed to launched apps (see XDGSpecHelper#exec_app's
 	 * defaults, natively), keyed by name. An entry here overrides the matching
@@ -37,11 +38,13 @@ public class WaylandCraftSettings {
 	public static final String PIXELS_PER_BLOCK = "pixelsPerBlock";
 	public static final String FOCUS_ON_HOVER = "focusOnHover";
 	public static final String TERMINAL_CHOICE = "terminalChoice";
+	public static final String DETACH_CURSOR = "detachCursor";
 
 	public static final String[] SETTINGS = new String[] {
 			PIXELS_PER_BLOCK,
 			FOCUS_ON_HOVER,
-			TERMINAL_CHOICE
+			TERMINAL_CHOICE,
+			DETACH_CURSOR
 	};
 
 	/* This is where the getters go */
@@ -60,6 +63,10 @@ public class WaylandCraftSettings {
 
 	public Map<String, String> getEnvOverrides() {
 		return envOverrides;
+	}
+	
+	public boolean getDetachCursor() {
+		return detachCursor;
 	}
 	
 	/* Methods to modifiy settings by name */

@@ -1,6 +1,8 @@
 package dev.evvie.waylandcraft;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Stream;
@@ -10,6 +12,7 @@ import org.lwjgl.glfw.GLFW;
 import org.lwjgl.system.Platform;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.blaze3d.platform.Window;
 
 import dev.evvie.waylandcraft.bridge.WLCAbstractWindow;
 import dev.evvie.waylandcraft.bridge.WLCAbstractWindow.SurfaceGeometry;
@@ -55,6 +58,9 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Camera;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.MouseHandler;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Overlay;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
@@ -189,6 +195,33 @@ public class WaylandCraft implements ClientModInitializer {
 		displays.forEach((d) -> d.render(ctx));
 	}
 	
+	// called in the pick() method of MinecraftMixin
+	public void updatePointer() {
+		if(bridge == null) return;
+
+		Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
+		processPointerMotion(camera);
+		
+		if(Minecraft.getInstance().player == null || !Minecraft.getInstance().player.isUsingItem()) playerUsingWindowItem = false;
+		if(playerUsingWindowItem) {
+			ItemStack item = Minecraft.getInstance().player.getUseItem();
+			WLCToplevel toplevel = getToplevel(item);
+
+			if(toplevel != null) {
+				WindowDisplay display = getOrCreateDisplay(toplevel);
+				if(!playerWasUsingWindowItem) {
+					display.anchorDistance = 2.0;
+				}
+
+				display.doGrabMove(camera.position(), new Vec3(camera.forwardVector()), new Vec3(camera.upVector()), camera.yRot());
+
+				WaylandCraft.instance.bridge.focusSurface(toplevel);
+			}
+			else playerUsingWindowItem = false;
+		}
+		playerWasUsingWindowItem = playerUsingWindowItem;
+	}
+	
 	public void updateWorld(LevelExtractionContext ctx) {
 		for(WLCPopup popup : bridge.getMappedPopups()) {
 			WLCAbstractWindow root = popup;
@@ -211,6 +244,11 @@ public class WaylandCraft implements ClientModInitializer {
 		for(WLCPopup popup : bridge.getMappedPopups()) {
 			anchorToParent(popup);
 		}
+	}
+	
+	public void onClientTick(Minecraft minecraft) {
+		if(minecraft.player == null) return;
+		checkKeybinds(minecraft);
 		
 		updateDisplayRequests();
 		
@@ -227,28 +265,6 @@ public class WaylandCraft implements ClientModInitializer {
 			
 			bridge.focusSurface(focus);
 		}
-		
-		Camera camera = ctx.camera();
-		processPointerMotion(camera);
-		
-		if(Minecraft.getInstance().player == null || !Minecraft.getInstance().player.isUsingItem()) playerUsingWindowItem = false;
-		if(playerUsingWindowItem) {
-			ItemStack item = Minecraft.getInstance().player.getUseItem();
-			WLCToplevel toplevel = getToplevel(item);
-
-			if(toplevel != null) {
-				WindowDisplay display = getOrCreateDisplay(toplevel);
-				if(!playerWasUsingWindowItem) {
-					display.anchorDistance = 2.0;
-				}
-
-				display.doGrabMove(camera.position(), new Vec3(camera.forwardVector()), new Vec3(camera.upVector()), camera.yRot());
-
-				WaylandCraft.instance.bridge.focusSurface(toplevel);
-			}
-			else playerUsingWindowItem = false;
-		}
-		playerWasUsingWindowItem = playerUsingWindowItem;
 		
 		updateOutputSize(inWMScreen);
 	}
@@ -271,15 +287,10 @@ public class WaylandCraft implements ClientModInitializer {
 		bridge.deactivateKeyboard();
 		disablePointerCapture();
 	}
-	
-	public void onClientTick(Minecraft minecraft) {
-		if(minecraft.player == null) return;
-		checkKeybinds(minecraft);
-	}
 		
 	private void checkKeybinds(Minecraft minecraft) {
 		if(keyOpenScreen.consumeClick()) {
-			keyboardCaptureMode = KeyboardCaptureMode.NONE;
+			disableKeyboardCapture();
 			pointerGrabs.releaseAll();
 			minecraft.gui.setScreen(new WindowManagerScreen(WaylandCraft.instance));
 		}
@@ -448,24 +459,46 @@ public class WaylandCraft implements ClientModInitializer {
 	}
 	
 	public void disablePointerCapture() {
+		destroyPointerOverlay();
 		if(pointerCapture == null) return;
-		bridge.unlockPointer();
+		if(pointerCapture instanceof LockedPointerCapture) bridge.unlockPointer();
 		pointerCapture = null;
+	}
+	
+	public void destroyPointerOverlay() {
+		if(Minecraft.getInstance().getOverlay() instanceof PointerCaptureOverlay overlay) {
+			overlay.destroy();
+			Minecraft.getInstance().setOverlay(null);
+		}
 	}
 	
 	private void processPointerMotion(Camera camera) {
 		this.cursorShape = null;
 		
 		if(pointerCapture != null) {
-			if(!pointerCapture.surface.isAlive()) {
-				pointerCapture = null;
+			if(!pointerCapture.isValid()) {
+				disablePointerCapture();
 				return;
 			}
 			
-			this.cursorShape = bridge.getCursorShape();
+			if(pointerCapture instanceof LockedPointerCapture) this.cursorShape = bridge.getCursorShape();
+			else this.cursorShape = CursorShape.HIDE;
 			
-			if(!bridge.maybeLockPointer(pointerCapture.surface)) {
+			boolean locked = pointerCapture.surface != null && bridge.maybeLockPointer(pointerCapture.surface);
+			boolean detach = settings.getDetachCursor();
+			if(pointerCapture instanceof LockedPointerCapture && !locked) {
+				PointerCapture old = pointerCapture;
 				disablePointerCapture();
+				if(detach) {
+					pointerCapture = new MotionPointerCapture(old.display, old.pressedButtons);
+				}
+			}
+			else if(pointerCapture instanceof MotionPointerCapture && locked) {
+				PointerCapture old = pointerCapture;
+				disablePointerCapture();
+				if(detach) {
+					pointerCapture = new LockedPointerCapture(old.display, old.surface, old.pressedButtons);
+				}
 			}
 			
 			return;
@@ -537,14 +570,21 @@ public class WaylandCraft implements ClientModInitializer {
 		}
 		
 		if(hoveredDisplay != null && hoveredDisplay.dist >= 0) {
+			WindowDisplay display = hoveredDisplay.target;
 			WLCSurface surface = hoveredDisplay.surface;
 			Vec3 rel = hoveredDisplay.surfaceLocalRelative;
 			
 			this.cursorShape = bridge.getCursorShape();
 			bridge.sendMotionRefocus(surface, rel.x, rel.y);
 			
-			if(keyboardCaptureMode != KeyboardCaptureMode.NONE && bridge.maybeLockPointer(surface)) {
-				pointerCapture = new PointerCapture(surface, rel.x, rel.y);
+			if(keyboardCaptureMode != KeyboardCaptureMode.NONE) {
+				boolean pointerLocked = bridge.maybeLockPointer(surface);
+				if(pointerLocked) {
+					pointerCapture = new LockedPointerCapture(display, surface);
+				}
+				else if(settings.getDetachCursor()) {
+					pointerCapture = new MotionPointerCapture(display);
+				}
 			}
 			
 			// Focus on hover
@@ -621,8 +661,7 @@ public class WaylandCraft implements ClientModInitializer {
 	public boolean onMouseTurn(double dx, double dy) {
 		if(bridge == null) return false;
 		if(pointerCapture == null) return false;
-		
-		bridge.sendRelativeMotion(dx, dy);
+		if(pointerCapture instanceof LockedPointerCapture) bridge.sendRelativeMotion(dx, dy);
 		return true;
 	}
 	
@@ -729,20 +768,99 @@ public class WaylandCraft implements ClientModInitializer {
 		
 	}
 	
-	public static class PointerCapture {
+	public abstract class PointerCapture {
 		
-		public final WLCSurface surface;
+		public final WindowDisplay display;
+		public final HashSet<Integer> pressedButtons;
 		
-		// Pointer capture entry surface-local coordinates
-		public double x;
-		public double y;
+		public WLCSurface surface;
 		
-		public HashSet<Integer> pressedButtons = new HashSet<Integer>();
-		
-		public PointerCapture(WLCSurface surface, double x, double y) {
+		public PointerCapture(WindowDisplay display, WLCSurface surface, Collection<Integer> pressedButtons) {
+			this.display = display;
 			this.surface = surface;
-			this.x = x;
-			this.y = y;
+			this.pressedButtons = new HashSet<Integer>(pressedButtons);
+		}
+		
+		public boolean isValid() {
+			return displays.contains(display);
+		}
+		
+	}
+	
+	public class LockedPointerCapture extends PointerCapture {
+		
+		public LockedPointerCapture(WindowDisplay display, WLCSurface surface, Collection<Integer> pressedButtons) {
+			super(display, surface, pressedButtons);
+		}
+		
+		public LockedPointerCapture(WindowDisplay display, WLCSurface surface) {
+			this(display, surface, Collections.emptyList());
+		}
+		
+		@Override
+		public boolean isValid() {
+			return super.isValid() && surface.isAlive();
+		}
+		
+	}
+	
+	public class MotionPointerCapture extends PointerCapture {
+		
+		public MotionPointerCapture(WindowDisplay display, Collection<Integer> pressedButtons) {
+			super(display, null, pressedButtons);
+			
+			if(Minecraft.getInstance().getOverlay() == null) Minecraft.getInstance().setOverlay(new PointerCaptureOverlay());
+		}
+		
+		public MotionPointerCapture(WindowDisplay display) {
+			this(display, Collections.emptyList());
+		}
+		
+	}
+	
+	public class PointerCaptureOverlay extends Overlay {
+		
+		public static final ScopedValue<Void> STOP_KEYMAPPING_SET_ALL = ScopedValue.newInstance();
+		
+		public PointerCaptureOverlay() {
+			Minecraft.getInstance().mouseHandler.releaseMouse();
+		}
+		
+		public void destroy() {
+			ScopedValue.where(STOP_KEYMAPPING_SET_ALL, null).run(() -> {
+				Minecraft.getInstance().mouseHandler.grabMouse();
+			});
+		}
+		
+		@Override
+		public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a) {
+			if(!(pointerCapture instanceof MotionPointerCapture motionCapture)) return;
+			
+			Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
+			Camera.NearPlane plane = camera.getNearPlane(Minecraft.getInstance().options.fov().get().intValue());
+			MouseHandler mouseHandler = Minecraft.getInstance().mouseHandler;
+			Window window = Minecraft.getInstance().getWindow();
+			
+			double rx = mouseHandler.xpos() / window.getWidth() * 2 - 1;
+			double ry = -(mouseHandler.ypos() / window.getHeight() * 2 - 1);
+			
+			Vec3 pos = camera.position();
+			Vec3 look = plane.getPointOnPlane((float) rx, (float) ry).normalize();
+			
+			DisplayHitResult result = pointerCapture.display.intersect(pos, look);
+			if(result.isMiss()) {
+				bridge.sendMotionOutside();
+				motionCapture.surface = null;
+			}
+			else {
+				bridge.sendMotionRefocus(result.surface, result.surfaceLocalRelative.x, result.surfaceLocalRelative.y);
+				motionCapture.surface = result.surface;
+			}
+		}
+		
+		@Override
+		public boolean isPauseScreen() {
+			return false;
 		}
 		
 	}

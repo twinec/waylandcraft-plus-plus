@@ -169,7 +169,7 @@ public class WaylandCraftBridge {
 			}
 		}
 		else {
-			WaylandCraftCommon.LOGGER.error("Failed to query render node path via EGL, falling back to scanning /dev/dri");
+			WaylandCraftCommon.LOGGER.error("Failed to query render node path via EGL (this could indicate a software renderer), falling back to scanning /dev/dri");
 		}
 
 		File[] candidates = new File("/dev/dri").listFiles((dir, name) -> name.startsWith("renderD"));
