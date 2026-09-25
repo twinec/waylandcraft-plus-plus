@@ -319,7 +319,6 @@ public class WaylandCraft implements ClientModInitializer {
 		if(WaylandCraft.instance.bridge == null) return null;
 		
 		WindowHandle data = item.get(WindowItem.WINDOW_HANDLE);
-		if(data == null) data = WindowHandle.fromCustomData(item);
 		if(data == null) return null;
 		if(!data.matchesPlayer(Minecraft.getInstance().player)) return null;
 		
