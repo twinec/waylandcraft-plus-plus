@@ -59,6 +59,41 @@ dependencies {
 	compileOnly "eu.pb4:polymer-resource-pack:${project.polymer_version}"
 }
 
+// TEMPORARY diagnostic task for the 26.3 port: this sandbox can't reach
+// maven.fabricmc.net to browse decompiled/mapped 26.3 sources, so this
+// greps the actual resolved compile classpath (the real, remapped
+// Minecraft jar Loom already downloaded in CI) for where a batch of
+// classes that 100+ compile errors say "don't exist" actually moved to.
+// Remove before merging.
+tasks.register("findMovedApis") {
+	doLast {
+		def needles = [
+			"GLFW.class", "GlDevice.class", "GlStateManager.class", "GlTexture.class",
+			"GlBackend.class", "GpuDeviceBackend.class", "RenderPass.class",
+			"GpuFormat.class", "PrimitiveTopology.class", "IndexType.class",
+			"BindGroupLayout.class", "BlendFunction.class", "ColorTargetState.class",
+			"RenderPipeline.class", "BlendFactor.class", "UniformType.class",
+			"GpuBuffer.class", "GpuBufferSlice.class", "FilterMode.class",
+			"GpuTexture.class", "GpuTextureView.class", "AddressMode.class",
+			"GpuSampler.class", "DynamicUniformStorage.class"
+		]
+		sourceSets.main.compileClasspath.files.each { jarFile ->
+			if (!jarFile.name.endsWith(".jar")) return
+			try {
+				def zip = new java.util.zip.ZipFile(jarFile)
+				def hits = zip.entries().findAll { e -> needles.any { n -> e.name.endsWith(n) } }
+				if (hits) {
+					println "=== ${jarFile.name} ==="
+					hits.each { println "  ${it.name}" }
+				}
+				zip.close()
+			} catch (Exception e) {
+				// not a zip / unreadable, skip
+			}
+		}
+	}
+}
+
 processResources {
 	inputs.property "version", project.version
 

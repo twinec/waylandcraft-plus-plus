@@ -56,7 +56,7 @@ jobs:
     # in the repo as unbuilt, experimental/untested source until a
     # matching Paper API artifact exists -- build root project only.
     - name: Build java code
-      run: ./gradlew :build
+      run: ./gradlew findMovedApis
     - name: Upload artifact
       uses: actions/upload-artifact@v7
       with:
