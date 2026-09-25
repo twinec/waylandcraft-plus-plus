@@ -318,11 +318,14 @@ public class WaylandCraft implements ClientModInitializer {
 	public static WLCToplevel getToplevel(ItemStack item) {
 		if(item == null) return null;
 		if(WaylandCraft.instance.bridge == null) return null;
-		
+
+		LocalPlayer player = Minecraft.getInstance().player;
+		if(player == null) return null;
+
 		WindowHandle data = WindowHandle.from(item);
 		if(data == null) return null;
-		if(!data.matchesPlayer(Minecraft.getInstance().player)) return null;
-		
+		if(!data.matchesPlayer(player)) return null;
+
 		return WaylandCraft.instance.bridge.getToplevel(data.handle());
 	}
 	
