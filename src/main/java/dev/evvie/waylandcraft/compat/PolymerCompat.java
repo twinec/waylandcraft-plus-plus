@@ -3,20 +3,22 @@ package dev.evvie.waylandcraft.compat;
 import eu.pb4.polymer.common.api.PolymerCommonUtils;
 import eu.pb4.polymer.core.api.item.PolymerItem;
 import eu.pb4.polymer.core.api.utils.PolymerClientDecoded;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import eu.pb4.polymer.core.api.utils.PolymerSyncedObject;
 import net.fabricmc.fabric.api.networking.v1.context.PacketContext;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.TooltipFlag;
 
 import dev.evvie.waylandcraft.WaylandCraftCommon;
 import dev.evvie.waylandcraft.item.WindowHandle;
 import dev.evvie.waylandcraft.item.WindowItem;
-import dev.evvie.waylandcraft.network.ClientboundHelloPayload;
+import dev.evvie.waylandcraft.network.WaylandCraftPresence;
 
 /**
  * Registers WaylandCraft's items as Polymer overlays, using
@@ -49,7 +51,20 @@ public class PolymerCompat {
 			ResourcePackHook.addAssets();
 		}
 
-		PolymerItem.registerOverlay(WindowItem.WINDOW, new WindowItemPolymerOverlay());
+		// Not PolymerItem.registerOverlay(...) -- that also calls
+		// RegistrySyncUtils.setServerEntry(), which moves WINDOW to the tail
+		// of the server's item registry at freeze time. That reorder is only
+		// ever communicated to clients over Polymer's own networking
+		// handshake, which real WaylandCraft clients don't speak (we use our
+		// own CONFIGURATION-phase handshake, see WaylandCraftPresence) --
+		// so a real client sent the true item id has no matching entry in
+		// its own registry, decode throws "No value with id N". Registering
+		// only the plain synced-object overlay keeps the disguise-on-encode
+		// behavior (that's independent of setServerEntry) without moving
+		// WINDOW's id, so ordinary fabric-registry-sync-v0 keeps informing
+		// every client of its real, unmoved id like any other modded item.
+		// See project memory: container-set-content-decode-crash.
+		PolymerSyncedObject.setPlainSyncedObject(BuiltInRegistries.ITEM, WindowItem.WINDOW, new WindowItemPolymerOverlay());
 	}
 
 	// Isolated in its own class so merely loading PolymerCompat doesn't
@@ -87,21 +102,40 @@ public class PolymerCompat {
 			return FALLBACK_MODEL;
 		}
 
+		// Not modifyBasePolymerItemStack -- Polymer's own createItemStack()
+		// unconditionally overwrites CUSTOM_DATA *after* modifyBasePolymerItemStack
+		// runs (it stuffs its own "$polymer:stack" wrapper in there for every
+		// client, virtualized or not), so anything WindowHandle-related set
+		// during modifyBasePolymerItemStack gets clobbered before the packet
+		// is even built. Overriding getPolymerItemStack instead lets us
+		// re-stamp the handle onto the final stack *after* Polymer is done
+		// with it. WindowHandle.writeTo() merges into CUSTOM_DATA under its
+		// own nested compound key rather than replacing the component, so it
+		// coexists with Polymer's own "$polymer:stack" data there. Real
+		// clients need this to identify which toplevel the item refers to;
+		// other clients don't know what it means and don't need it either.
+		// See project memory: container-set-content-decode-crash.
 		@Override
-		public void modifyBasePolymerItemStack(ItemStack out, ItemStack stack, PacketContext context, HolderLookup.Provider lookup) {
-			// Real WaylandCraft clients need the window handle data to
-			// identify which toplevel the item refers to; other clients
-			// don't know what it means and don't need it either.
-			if(!hasWaylandCraft(context)) WindowHandle.strip(out);
+		public ItemStack getPolymerItemStack(ItemStack itemStack, TooltipFlag tooltipType, PacketContext context, HolderLookup.Provider lookup) {
+			ItemStack out = PolymerItem.super.getPolymerItemStack(itemStack, tooltipType, context, lookup);
+			if(hasWaylandCraft(context)) {
+				WindowHandle handle = WindowHandle.from(itemStack);
+				if(handle != null) handle.writeTo(out);
+			}
+			return out;
 		}
 
-		// Detects whether the connecting player has WaylandCraft installed,
-		// via the mod's own networking channel being registered on their
-		// connection -- players who do should see and interact with the
-		// real item/data, not the vanilla-safe fallback.
+		// Detects whether the connecting player has WaylandCraft installed.
+		// Backed by WaylandCraftPresence, which checks channel registration
+		// during the CONFIGURATION phase rather than with a live
+		// ServerPlayNetworking#canSend() check here -- a PLAY-phase check
+		// raced the server's very first PLAY packets (like the initial
+		// inventory sync), incorrectly reporting players as not having
+		// WaylandCraft installed. See project memory:
+		// container-set-content-decode-crash.
 		private static boolean hasWaylandCraft(PacketContext context) {
 			ServerPlayer player = PolymerCommonUtils.getPlayer(context);
-			return player != null && ServerPlayNetworking.canSend(player, ClientboundHelloPayload.TYPE);
+			return player != null && WaylandCraftPresence.has(player.getUUID());
 		}
 
 	}

@@ -46,6 +46,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import dev.evvie.waylandcraft.network.ClientboundHelloPayload;
@@ -124,9 +125,13 @@ public class WaylandCraft implements ClientModInitializer {
 		
 		instance = this;
 
-		// No-op receiver -- its only purpose is making the client announce
+		// No-op receivers -- their only purpose is making the client announce
 		// support for this channel, so the server can detect WaylandCraft's
-		// presence via ServerPlayNetworking#canSend (see PolymerCompat).
+		// presence (see WaylandCraftPresence/PolymerCompat). Registered for
+		// both CONFIGURATION (the one WaylandCraftPresence actually checks,
+		// since it's guaranteed to complete before PLAY starts) and PLAY
+		// (kept so the channel is still announced there too).
+		ClientConfigurationNetworking.registerGlobalReceiver(ClientboundHelloPayload.TYPE, (payload, ctx) -> {});
 		ClientPlayNetworking.registerGlobalReceiver(ClientboundHelloPayload.TYPE, (payload, ctx) -> {});
 
 		keyOpenScreen = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.windowManager", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_B, KEYBIND_CATEGORY));
@@ -313,11 +318,14 @@ public class WaylandCraft implements ClientModInitializer {
 	public static WLCToplevel getToplevel(ItemStack item) {
 		if(item == null) return null;
 		if(WaylandCraft.instance.bridge == null) return null;
-		
+
+		LocalPlayer player = Minecraft.getInstance().player;
+		if(player == null) return null;
+
 		WindowHandle data = WindowHandle.from(item);
 		if(data == null) return null;
-		if(!data.matchesPlayer(Minecraft.getInstance().player)) return null;
-		
+		if(!data.matchesPlayer(player)) return null;
+
 		return WaylandCraft.instance.bridge.getToplevel(data.handle());
 	}
 	
