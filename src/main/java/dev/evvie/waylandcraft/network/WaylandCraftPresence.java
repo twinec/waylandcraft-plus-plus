@@ -25,11 +25,11 @@ public class WaylandCraftPresence {
 	private static final Set<UUID> PRESENT = ConcurrentHashMap.newKeySet();
 
 	public static void register() {
-		PayloadTypeRegistry.configurationS2C().register(ClientboundHelloPayload.TYPE, ClientboundHelloPayload.CODEC);
+		PayloadTypeRegistry.clientboundConfiguration().register(ClientboundHelloPayload.TYPE, ClientboundHelloPayload.CODEC);
 
 		ServerConfigurationConnectionEvents.CONFIGURE.register((handler, server) -> {
 			if(ServerConfigurationNetworking.canSend(handler, ClientboundHelloPayload.TYPE)) {
-				PRESENT.add(handler.getOwner().getId());
+				PRESENT.add(handler.getOwner().id());
 			}
 		});
 
