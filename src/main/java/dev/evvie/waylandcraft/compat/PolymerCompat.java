@@ -2,6 +2,7 @@ package dev.evvie.waylandcraft.compat;
 
 import eu.pb4.polymer.common.api.PolymerCommonUtils;
 import eu.pb4.polymer.core.api.item.PolymerItem;
+import eu.pb4.polymer.core.api.utils.PolymerClientDecoded;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.context.PacketContext;
 import net.fabricmc.loader.api.FabricLoader;
@@ -63,7 +64,16 @@ public class PolymerCompat {
 
 	}
 
-	private static class WindowItemPolymerOverlay implements PolymerItem {
+	// PolymerClientDecoded tells Polymer this item has a "companion client
+	// side mod" that decodes it itself -- without it, Polymer appears to
+	// virtualize/re-encode this item's network representation for *every*
+	// client, including real WaylandCraft clients that never installed
+	// Polymer, which broke item-stack decoding entirely (see project memory:
+	// polymer-datacomponent-registration). shouldDecodePolymer() defaults to
+	// true, which is what we want since getPolymerItem/modifyBasePolymerItemStack
+	// above already return the real server-side item for players who have
+	// WaylandCraft installed.
+	private static class WindowItemPolymerOverlay implements PolymerItem, PolymerClientDecoded {
 
 		@Override
 		public Item getPolymerItem(ItemStack itemStack, PacketContext context) {
