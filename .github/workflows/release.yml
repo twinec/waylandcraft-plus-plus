@@ -128,7 +128,7 @@ jobs:
     - name: Setup gradle
       uses: gradle/actions/setup-gradle@v6
     - name: Build java code
-      run: ./gradlew :build
+      run: ./gradlew build
 
     # Publicly, verifiably ties this exact jar to this exact commit/workflow
     # run via Sigstore -- checkable with `gh attestation verify <jar> -R <repo>`.
