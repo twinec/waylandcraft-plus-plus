@@ -34,11 +34,16 @@ public class WaylandCraftCommon implements ModInitializer {
 		// isModLoaded guard) throws NoClassDefFoundError when polymer-core
 		// isn't present, since verifying its bytecode requires resolving
 		// PolymerItem.
-		if(FabricLoader.getInstance().isModLoaded("polymer-core")) {
+		// DIAGNOSTIC BUILD: Polymer compat force-disabled to isolate a
+		// container_set_slot decode crash on a real client joining a
+		// Polymer+Server Backpacks server -- see [[polymer-datacomponent-registration]]
+		// in project memory. Re-enable once the cause is confirmed.
+		boolean polymerCompatDiagnosticallyDisabled = true;
+		if(!polymerCompatDiagnosticallyDisabled && FabricLoader.getInstance().isModLoaded("polymer-core")) {
 			LOGGER.info("polymer-core detected, registering Polymer compat");
 			PolymerCompat.register();
 		} else {
-			LOGGER.info("polymer-core not detected, skipping Polymer compat");
+			LOGGER.info("polymer-core not detected (or Polymer compat diagnostically disabled), skipping Polymer compat");
 		}
 
 		WaylandCraftNetworking.register();
