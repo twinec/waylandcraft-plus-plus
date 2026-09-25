@@ -52,6 +52,10 @@ Servers can opt to install the mod, which will allow players to use the window i
 If the server doesn't support it, you can spawn a window in the world by going into the wm screen (default bind `B`)
 and then pressing and holding the "Grab" button.
 
+There's also a companion `paper-plugin/` module in this repo for giving out window items on Paper servers that
+can't load the Fabric mod at all. **It's experimental and untested** — it hasn't been run against a live Paper
+server yet, so expect rough edges. If you're willing to try it out and report back, it'd be appreciated!
+
 ### Does this work in VR?
 Depending on your VR mod, you can probably get the windows to display fine but you probably won't be able to interact with
 the windows using your controller. Soooo, kinda.
