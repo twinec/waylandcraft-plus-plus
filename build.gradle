@@ -59,44 +59,6 @@ dependencies {
 	compileOnly "eu.pb4:polymer-resource-pack:${project.polymer_version}"
 }
 
-// TEMPORARY diagnostic task for the 26.3 port: this sandbox can't reach
-// maven.fabricmc.net to browse decompiled/mapped 26.3 sources, so this
-// greps the actual resolved compile classpath (the real, remapped
-// Minecraft jar Loom already downloaded in CI) for where a batch of
-// classes that 100+ compile errors say "don't exist" actually moved to.
-// Remove before merging.
-tasks.register("findMovedApis") {
-	doLast {
-		println "=== full compileClasspath (${sourceSets.main.compileClasspath.files.size()} entries) ==="
-		sourceSets.main.compileClasspath.files.each { println "  ${it.name}" }
-		sourceSets.main.compileClasspath.files.each { jarFile ->
-			if (!jarFile.name.endsWith(".jar")) return
-			try {
-				def zip = new java.util.zip.ZipFile(jarFile)
-				def hits = zip.entries().findAll { e -> e.name.endsWith("GLFW.class") || e.name.contains("glfw") }
-				if (hits) {
-					println "=== ${jarFile.name} (${hits.size()} glfw matches) ==="
-					hits.sort { it.name }.each { println "  ${it.name}" }
-				}
-				if (jarFile.name.contains("minecraft-merged")) {
-					def uniformStorage = zip.entries().findAll { e ->
-						e.name.startsWith("net/minecraft/client/renderer/") &&
-						!e.name.substring("net/minecraft/client/renderer/".length()).contains("/") &&
-						(e.name.contains("Buffer") || e.name.contains("Storage") || e.name.contains("Uniform"))
-					}
-					if (uniformStorage) {
-						println "=== net/minecraft/client/renderer/ Buffer|Storage|Uniform top-level (${uniformStorage.size()}) ==="
-						uniformStorage.sort { it.name }.each { println "  ${it.name}" }
-					}
-				}
-				zip.close()
-			} catch (Exception e) {
-				// not a zip / unreadable, skip
-			}
-		}
-	}
-}
-
 processResources {
 	inputs.property "version", project.version
 
