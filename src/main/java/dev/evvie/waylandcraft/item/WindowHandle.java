@@ -2,10 +2,6 @@ package dev.evvie.waylandcraft.item;
 
 import java.util.UUID;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
-
-import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.player.Player;
@@ -13,20 +9,26 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * A window item's {player, handle} pair, stored on the wire inside the
+ * item's ordinary vanilla CUSTOM_DATA component rather than a custom
+ * DataComponentType. A custom DataComponentType's network id is assigned
+ * by registration order at registry-freeze time, which isn't guaranteed
+ * to match between a client (with many more mods, e.g. rendering/QoL
+ * mods that also register components) and a bare Fabric server running
+ * only WaylandCraft -- causing "No value with id N" decode failures for
+ * *any* item once the ordinals disagree. CUSTOM_DATA is a fixed vanilla
+ * registry entry present at the same id everywhere, so it can't drift.
+ * This also happens to be the exact format the companion Paper plugin
+ * (paper-plugin/) already writes via Bukkit's PersistentDataContainer,
+ * since Paper can't register a custom DataComponentType at all -- so
+ * Fabric and Paper servers now produce identical wire data.
+ */
 public record WindowHandle(UUID player, long handle) {
 
-	public static final Codec<WindowHandle> CODEC = RecordCodecBuilder.create(builder -> {
-		return builder.group(
-				UUIDUtil.CODEC.fieldOf("player").forGetter(WindowHandle::player),
-				Codec.LONG.fieldOf("handle").forGetter(WindowHandle::handle)
-		).apply(builder, WindowHandle::new);
-	});
-
-	// Namespace/keys the companion Paper plugin (paper-plugin/) writes
-	// into, matching WindowHandleData on that side.
-	private static final String PAPER_VALUES_COMPOUND = "PublicBukkitValues";
-	private static final String PAPER_PLAYER_KEY = "waylandcraft:player";
-	private static final String PAPER_HANDLE_KEY = "waylandcraft:handle";
+	private static final String VALUES_COMPOUND = "PublicBukkitValues";
+	private static final String PLAYER_KEY = "waylandcraft:player";
+	private static final String HANDLE_KEY = "waylandcraft:handle";
 
 	public static WindowHandle forPlayer(Player player, long handle) {
 		return new WindowHandle(getPlayerUUID(player), handle);
@@ -40,29 +42,42 @@ public record WindowHandle(UUID player, long handle) {
 		return getPlayerUUID(player).equals(this.player());
 	}
 
-	/**
-	 * Fallback for window items given by the companion Paper plugin
-	 * instead of a real Fabric server -- Paper can't register a genuine
-	 * WINDOW_HANDLE DataComponentType (see WaylandCraft++'s README/docs
-	 * for why), so it instead writes {player, handle} via Bukkit's
-	 * PersistentDataContainer, which Paper stores inside the item's real
-	 * vanilla CUSTOM_DATA component under a "PublicBukkitValues"
-	 * compound. Not verified against a live Paper server capture --
-	 * check this first if fallback parsing silently fails.
-	 */
+	public void writeTo(ItemStack stack) {
+		CustomData existing = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
+		CompoundTag root = existing.copyTag();
+		CompoundTag values = root.getCompoundOrEmpty(VALUES_COMPOUND);
+		values.putString(PLAYER_KEY, player.toString());
+		values.putLong(HANDLE_KEY, handle);
+		root.put(VALUES_COMPOUND, values);
+		stack.set(DataComponents.CUSTOM_DATA, CustomData.of(root));
+	}
+
+	/** Strips this handle data from an item, e.g. before showing it to a
+	 * client that doesn't understand it. */
+	public static void strip(ItemStack stack) {
+		CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
+		if(custom == null) return;
+
+		CompoundTag root = custom.copyTag();
+		if(!root.contains(VALUES_COMPOUND)) return;
+
+		root.remove(VALUES_COMPOUND);
+		stack.set(DataComponents.CUSTOM_DATA, CustomData.of(root));
+	}
+
 	@Nullable
-	public static WindowHandle fromCustomData(ItemStack item) {
+	public static WindowHandle from(ItemStack item) {
 		CustomData custom = item.get(DataComponents.CUSTOM_DATA);
 		if(custom == null) return null;
 
 		CompoundTag root = custom.copyTag();
-		if(!root.contains(PAPER_VALUES_COMPOUND)) return null;
+		if(!root.contains(VALUES_COMPOUND)) return null;
 
-		CompoundTag values = root.getCompoundOrEmpty(PAPER_VALUES_COMPOUND);
-		String playerStr = values.getStringOr(PAPER_PLAYER_KEY, "");
+		CompoundTag values = root.getCompoundOrEmpty(VALUES_COMPOUND);
+		String playerStr = values.getStringOr(PLAYER_KEY, "");
 		if(playerStr.isEmpty()) return null;
 
-		long handle = values.getLongOr(PAPER_HANDLE_KEY, Long.MIN_VALUE);
+		long handle = values.getLongOr(HANDLE_KEY, Long.MIN_VALUE);
 		if(handle == Long.MIN_VALUE) return null;
 
 		try {

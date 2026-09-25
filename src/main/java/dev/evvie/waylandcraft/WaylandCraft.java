@@ -35,7 +35,6 @@ import dev.evvie.waylandcraft.gui.AppLauncherScreen;
 import dev.evvie.waylandcraft.gui.WaylandHudRenderer;
 import dev.evvie.waylandcraft.gui.WindowManagerScreen;
 import dev.evvie.waylandcraft.item.WindowHandle;
-import dev.evvie.waylandcraft.item.WindowItem;
 import dev.evvie.waylandcraft.item.WindowItemManager;
 import dev.evvie.waylandcraft.render.WindowInHandRenderer;
 import dev.evvie.waylandcraft.render.WindowInItemFrameRenderer;
@@ -318,8 +317,7 @@ public class WaylandCraft implements ClientModInitializer {
 		if(item == null) return null;
 		if(WaylandCraft.instance.bridge == null) return null;
 		
-		WindowHandle data = item.get(WindowItem.WINDOW_HANDLE);
-		if(data == null) data = WindowHandle.fromCustomData(item);
+		WindowHandle data = WindowHandle.from(item);
 		if(data == null) return null;
 		if(!data.matchesPlayer(Minecraft.getInstance().player)) return null;
 		
@@ -327,7 +325,7 @@ public class WaylandCraft implements ClientModInitializer {
 	}
 	
 	private void addWindowItemTooltip(ItemStack itemStack, TooltipContext ctx, TooltipFlag flag, List<Component> list) {
-		WindowHandle handle = itemStack.get(WindowItem.WINDOW_HANDLE);
+		WindowHandle handle = WindowHandle.from(itemStack);
 		if(handle != null) {
 			String text = "Handle 0x" + Long.toHexString(handle.handle());
 			Component component = Component

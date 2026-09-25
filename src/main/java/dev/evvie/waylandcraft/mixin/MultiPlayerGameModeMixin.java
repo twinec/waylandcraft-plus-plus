@@ -18,7 +18,7 @@ import net.minecraft.world.item.ItemStack;
  * "hold to view" interaction) for window items given by the companion
  * Paper plugin (paper-plugin/) instead of a real Fabric server. Those
  * items are a plain vanilla base item carrying fallback NBT (see
- * WindowHandle#fromCustomData) rather than a real registered WindowItem,
+ * WindowHandle#from) rather than a real registered WindowItem,
  * so WindowItem's own Item#use()/#onUseTick() overrides never fire for
  * them at all -- there's no real WindowItem class involved. This mixin
  * covers that gap by hooking client-side item-use dispatch directly,
