@@ -23,15 +23,7 @@ public class MouseHandlerMixin {
 		if(WaylandCraft.instance.onButtonPress(windowHandle, buttonInfo.button(), action, buttonInfo.modifiers())) info.cancel();
 	}
 	
-	// Target updated for the Minecraft.getOverlay() -> Minecraft.gui.overlay()
-	// move (see WaylandCraft.java's same-shaped fix in 6a8262c): vanilla's
-	// onButton/onScroll can no longer call a method that doesn't exist on
-	// Minecraft, so the actual INVOKE site must now live on Gui. Best-effort
-	// guess at the owner class/descriptor -- not verified against a real
-	// decompile or an in-game launch, since neither is possible in this
-	// sandbox. If mixin application fails at launch, this is the first
-	// place to check.
-	@Inject(method = "onButton", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Gui;overlay()Lnet/minecraft/client/gui/screens/Overlay;", ordinal = 0))
+	@Inject(method = "onButton", at = @At("RETURN"))
 	public void onButtonMaybeOverlay(long windowHandle, MouseButtonInfo buttonInfo, int action, CallbackInfo info) {
 		if(Minecraft.getInstance().gui.overlay() instanceof PointerCaptureOverlay && WaylandCraft.instance.pointerCapture != null) {
 			WaylandCraft.instance.onButtonPress(windowHandle, buttonInfo.button(), action, buttonInfo.modifiers());
@@ -43,8 +35,7 @@ public class MouseHandlerMixin {
 		if(WaylandCraft.instance.onScroll(windowHandle, scrollX, scrollY)) info.cancel();
 	}
 	
-	// Same unverified best-effort target update as onButtonMaybeOverlay above.
-	@Inject(method = "onScroll", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Gui;overlay()Lnet/minecraft/client/gui/screens/Overlay;", ordinal = 0))
+	@Inject(method = "onScroll", at = @At("RETURN"))
 	public void onScrollMaybeOverlay(long windowHandle, double scrollX, double scrollY, CallbackInfo info) {
 		if(Minecraft.getInstance().gui.overlay() instanceof PointerCaptureOverlay && WaylandCraft.instance.pointerCapture != null) {
 			WaylandCraft.instance.onScroll(windowHandle, scrollX, scrollY);
