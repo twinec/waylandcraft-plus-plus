@@ -4,11 +4,11 @@ Wayland Compositor in Minecraft
 
 [Demo video](https://youtu.be/cTkEM7b0IQw)
 
-Now available on [Modrinth](https://modrinth.com/mod/waylandcraft)!
+Coming soon to a [Modrinth](https://modrinth.com/mod/waylandcraft_plus_plus) near you!
 
 ## System dependencies
 - OS: Linux
-- Minecraft 26.1.2
+- Minecraft 26.2
 - Fabric mod loader
 - xkbcommon library 1.11.0
 - xkbcommon tools (xkbcli)
@@ -17,6 +17,7 @@ Now available on [Modrinth](https://modrinth.com/mod/waylandcraft)!
 Additionally recommended:
 - Prism Launcher
 - Sodium
+- Polymer (server-side only)
 
 ## Important notes for installing / using!!!
 1. Do not use a Minecraft launcher packaged as a flatpak! You won't be able to use your apps.
@@ -25,7 +26,7 @@ Additionally recommended:
 
 ## Frequently Asked Questions
 ### How do I use this thing?
-Download the mod from the releases section, install Minecraft Fabric for 26.1.2 and drag the jar file in your mods folder.
+Download the mod from the releases section, install Minecraft Fabric for 26.2 and drag the jar file in your mods folder.
 Look at your keybind settings. By default `V` opens the app launcher, `G` enables keyboard capture allowing you to type in
 the windows, `B` opens the window manager screen.
 
@@ -82,8 +83,8 @@ This compositor still has lots of issues and bugs. Use it at your own risk or wh
 
 ## Contribution Policy
 All contributions have to be made an accordance with the GPLv3 license (see `LICENSE`).
-Waylandcraft has some important policy around LLMs and generative AI, mostly because of code and contribution quality as well as some ethical and copyright concerns.
-Mergeable contributions made to the repository in the form of pull requests need to be made **without major usage** of LLMs.
+~~Waylandcraft has some important policy around LLMs and Degenerative AI, mostly because of code and contribution quality as well as some ethical and copyright concerns.
+Mergeable contributions made to the repository in the form of pull requests need to be made **without major usage** of LLMs.~~
 
-If you feel as though you have something worthwhile to contribute which was made using LLMs **please disclose it** and file it as a **draft** pull request instead.
-It will probably have to be more closely examined or even entirely rewritten by a human programmer, which can then be (re-)submitted as a normal pull request.
+~~If you feel as though you have something worthwhile to contribute which was made using LLMs **please disclose it** and file it as a **draft** pull request instead.
+It will probably have to be more closely examined or even entirely rewritten by a human programmer, which can then be (re-)submitted as a normal pull request.~~

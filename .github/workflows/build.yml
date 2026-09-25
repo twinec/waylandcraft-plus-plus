@@ -55,5 +55,5 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v7
       with:
-        path: build/libs/waylandcraft.jar
+        path: build/libs/waylandcraft_plus_plus.jar
         archive: false
