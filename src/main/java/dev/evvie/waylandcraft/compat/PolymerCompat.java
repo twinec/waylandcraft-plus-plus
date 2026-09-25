@@ -2,7 +2,6 @@ package dev.evvie.waylandcraft.compat;
 
 import eu.pb4.polymer.common.api.PolymerCommonUtils;
 import eu.pb4.polymer.core.api.item.PolymerItem;
-import eu.pb4.polymer.core.api.other.PolymerComponent;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.context.PacketContext;
 import net.fabricmc.loader.api.FabricLoader;
@@ -49,19 +48,6 @@ public class PolymerCompat {
 			ResourcePackHook.addAssets();
 		}
 
-		// WINDOW_HANDLE is a custom DataComponentType, whose network id is
-		// otherwise assigned by registration order at registry-freeze time --
-		// this only matches between real client and server if every mod
-		// registers the same set of components in the same order (see
-		// [[window-handle-registry-id-fix]] in project memory for the crash
-		// this caused before). Polymer's PolymerComponent API exists
-		// specifically to make a custom component safe across virtualized/
-		// mismatched clients instead of relying on that ordinal matching --
-		// following the pattern used by Server Backpacks' Polymer port,
-		// rather than our earlier workaround of avoiding custom components
-		// altogether.
-		PolymerComponent.registerDataComponent(WindowItem.WINDOW_HANDLE);
-
 		PolymerItem.registerOverlay(WindowItem.WINDOW, new WindowItemPolymerOverlay());
 	}
 
@@ -96,7 +82,7 @@ public class PolymerCompat {
 			// Real WaylandCraft clients need the window handle data to
 			// identify which toplevel the item refers to; other clients
 			// don't know what it means and don't need it either.
-			if(!hasWaylandCraft(context)) out.remove(WindowItem.WINDOW_HANDLE);
+			if(!hasWaylandCraft(context)) WindowHandle.strip(out);
 		}
 
 		// Detects whether the connecting player has WaylandCraft installed,
