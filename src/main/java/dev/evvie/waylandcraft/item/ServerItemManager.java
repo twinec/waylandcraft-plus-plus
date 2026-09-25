@@ -26,7 +26,7 @@ public class ServerItemManager implements ServerTickEvents.StartLevelTick {
 				ItemStack item = inv.getItem(i);
 				if(!item.is(WindowItem.WINDOW)) continue;
 				
-				WindowHandle handle = item.get(WindowItem.WINDOW_HANDLE);
+				WindowHandle handle = WindowHandle.from(item);
 				if(!WaylandCraftUtils.isHandleValid(level, handle)) {
 					inv.setItem(i, ItemStack.EMPTY);
 				}
@@ -45,7 +45,7 @@ public class ServerItemManager implements ServerTickEvents.StartLevelTick {
 			.filter((e) -> e instanceof ItemEntity)
 			.map((e) -> (ItemEntity) e)
 			.filter((e) -> e.getItem().is(WindowItem.WINDOW))
-			.filter((e) -> !WaylandCraftUtils.isHandleValid(level, e.getItem().get(WindowItem.WINDOW_HANDLE)))
+			.filter((e) -> !WaylandCraftUtils.isHandleValid(level, WindowHandle.from(e.getItem())))
 			.filter((e) -> e.getAge() > 10)
 			.forEach((e) -> {
 				level.sendParticles(ParticleTypes.FLAME, false, false, e.getX(), e.getY(), e.getZ(), 10, 0.15, 0.2, 0.15, 0.1);
@@ -88,8 +88,8 @@ public class ServerItemManager implements ServerTickEvents.StartLevelTick {
 		boolean foundToplevel = false;
 		for(int i = 0; i < inv.getContainerSize(); i++) {
 			ItemStack item = inv.getItem(i);
-			WindowHandle data = item.get(WindowItem.WINDOW_HANDLE);
-			
+			WindowHandle data = WindowHandle.from(item);
+
 			if(!item.is(WindowItem.WINDOW)) continue;
 			if(data != null && data.equals(searched)) {
 				foundToplevel = true;
@@ -105,7 +105,7 @@ public class ServerItemManager implements ServerTickEvents.StartLevelTick {
 	
 	public static ItemStack createItem(ServerPlayer player, long handle) {
 		ItemStack stack = new ItemStack(WindowItem.WINDOW, 1);
-		stack.set(WindowItem.WINDOW_HANDLE, WindowHandle.forPlayer(player, handle));
+		WindowHandle.forPlayer(player, handle).writeTo(stack);
 		return stack;
 	}
 	
