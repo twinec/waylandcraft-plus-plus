@@ -25,7 +25,7 @@ public class MouseHandlerMixin {
 	
 	@Inject(method = "onButton", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;getOverlay()Lnet/minecraft/client/gui/screens/Overlay;", ordinal = 0))
 	public void onButtonMaybeOverlay(long windowHandle, MouseButtonInfo buttonInfo, int action, CallbackInfo info) {
-		if(Minecraft.getInstance().getOverlay() instanceof PointerCaptureOverlay && WaylandCraft.instance.pointerCapture != null) {
+		if(Minecraft.getInstance().gui.overlay() instanceof PointerCaptureOverlay && WaylandCraft.instance.pointerCapture != null) {
 			WaylandCraft.instance.onButtonPress(windowHandle, buttonInfo.button(), action, buttonInfo.modifiers());
 		}
 	}
@@ -37,7 +37,7 @@ public class MouseHandlerMixin {
 	
 	@Inject(method = "onScroll", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;getOverlay()Lnet/minecraft/client/gui/screens/Overlay;", ordinal = 0))
 	public void onScrollMaybeOverlay(long windowHandle, double scrollX, double scrollY, CallbackInfo info) {
-		if(Minecraft.getInstance().getOverlay() instanceof PointerCaptureOverlay && WaylandCraft.instance.pointerCapture != null) {
+		if(Minecraft.getInstance().gui.overlay() instanceof PointerCaptureOverlay && WaylandCraft.instance.pointerCapture != null) {
 			WaylandCraft.instance.onScroll(windowHandle, scrollX, scrollY);
 		}
 	}
