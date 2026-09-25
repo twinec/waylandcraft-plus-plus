@@ -9,6 +9,8 @@ import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 
+import dev.evvie.waylandcraft.WaylandCraftCommon;
+
 /**
  * Tracks, per player, whether their client registered support for
  * WaylandCraft's networking channel -- checked once during the
@@ -28,7 +30,9 @@ public class WaylandCraftPresence {
 		PayloadTypeRegistry.clientboundConfiguration().register(ClientboundHelloPayload.TYPE, ClientboundHelloPayload.CODEC);
 
 		ServerConfigurationConnectionEvents.CONFIGURE.register((handler, server) -> {
-			if(ServerConfigurationNetworking.canSend(handler, ClientboundHelloPayload.TYPE)) {
+			boolean canSend = ServerConfigurationNetworking.canSend(handler, ClientboundHelloPayload.TYPE);
+			WaylandCraftCommon.LOGGER.info("[WaylandCraftPresence] CONFIGURE for {}: canSend(hello)={}", handler.getOwner().name(), canSend);
+			if(canSend) {
 				PRESENT.add(handler.getOwner().id());
 			}
 		});
@@ -39,7 +43,9 @@ public class WaylandCraftPresence {
 	}
 
 	public static boolean has(UUID playerId) {
-		return PRESENT.contains(playerId);
+		boolean present = PRESENT.contains(playerId);
+		WaylandCraftCommon.LOGGER.info("[WaylandCraftPresence] has({})={}", playerId, present);
+		return present;
 	}
 
 }
