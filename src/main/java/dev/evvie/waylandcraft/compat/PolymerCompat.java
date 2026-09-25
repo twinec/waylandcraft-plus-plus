@@ -13,6 +13,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.TooltipFlag;
 
 import dev.evvie.waylandcraft.WaylandCraftCommon;
 import dev.evvie.waylandcraft.item.WindowHandle;
@@ -101,12 +102,27 @@ public class PolymerCompat {
 			return FALLBACK_MODEL;
 		}
 
+		// Not modifyBasePolymerItemStack -- Polymer's own createItemStack()
+		// unconditionally overwrites CUSTOM_DATA *after* modifyBasePolymerItemStack
+		// runs (it stuffs its own "$polymer:stack" wrapper in there for every
+		// client, virtualized or not), so anything WindowHandle-related set
+		// during modifyBasePolymerItemStack gets clobbered before the packet
+		// is even built. Overriding getPolymerItemStack instead lets us
+		// re-stamp the handle onto the final stack *after* Polymer is done
+		// with it. WindowHandle.writeTo() merges into CUSTOM_DATA under its
+		// own nested compound key rather than replacing the component, so it
+		// coexists with Polymer's own "$polymer:stack" data there. Real
+		// clients need this to identify which toplevel the item refers to;
+		// other clients don't know what it means and don't need it either.
+		// See project memory: container-set-content-decode-crash.
 		@Override
-		public void modifyBasePolymerItemStack(ItemStack out, ItemStack stack, PacketContext context, HolderLookup.Provider lookup) {
-			// Real WaylandCraft clients need the window handle data to
-			// identify which toplevel the item refers to; other clients
-			// don't know what it means and don't need it either.
-			if(!hasWaylandCraft(context)) WindowHandle.strip(out);
+		public ItemStack getPolymerItemStack(ItemStack itemStack, TooltipFlag tooltipType, PacketContext context, HolderLookup.Provider lookup) {
+			ItemStack out = PolymerItem.super.getPolymerItemStack(itemStack, tooltipType, context, lookup);
+			if(hasWaylandCraft(context)) {
+				WindowHandle handle = WindowHandle.from(itemStack);
+				if(handle != null) handle.writeTo(out);
+			}
+			return out;
 		}
 
 		// Detects whether the connecting player has WaylandCraft installed.
