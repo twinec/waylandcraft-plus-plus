@@ -67,24 +67,19 @@ dependencies {
 // Remove before merging.
 tasks.register("findMovedApis") {
 	doLast {
-		def needles = [
-			"GLFW.class", "GlDevice.class", "GlStateManager.class", "GlTexture.class",
-			"GlBackend.class", "GpuDeviceBackend.class", "RenderPass.class",
-			"GpuFormat.class", "PrimitiveTopology.class", "IndexType.class",
-			"BindGroupLayout.class", "BlendFunction.class", "ColorTargetState.class",
-			"RenderPipeline.class", "BlendFactor.class", "UniformType.class",
-			"GpuBuffer.class", "GpuBufferSlice.class", "FilterMode.class",
-			"GpuTexture.class", "GpuTextureView.class", "AddressMode.class",
-			"GpuSampler.class", "DynamicUniformStorage.class"
-		]
+		def needles = ["FrameBufferCache.class"]
+		def substrings = ["Uniform", "renderpearl"]
 		sourceSets.main.compileClasspath.files.each { jarFile ->
-			if (!jarFile.name.endsWith(".jar")) return
+			if (!jarFile.name.contains("minecraft-merged")) return
 			try {
 				def zip = new java.util.zip.ZipFile(jarFile)
-				def hits = zip.entries().findAll { e -> needles.any { n -> e.name.endsWith(n) } }
+				def hits = zip.entries().findAll { e ->
+					needles.any { n -> e.name.endsWith(n) } ||
+					substrings.any { s -> e.name.contains(s) }
+				}
 				if (hits) {
-					println "=== ${jarFile.name} ==="
-					hits.each { println "  ${it.name}" }
+					println "=== ${jarFile.name} (${hits.size()} matches) ==="
+					hits.sort { it.name }.each { println "  ${it.name}" }
 				}
 				zip.close()
 			} catch (Exception e) {
