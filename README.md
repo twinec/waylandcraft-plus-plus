@@ -6,6 +6,12 @@ Wayland Compositor in Minecraft
 
 Coming soon to a [Modrinth](https://modrinth.com/mod/waylandcraft_plus_plus) near you!
 
+> **This branch adds read-only window sharing:** other players can watch and hear a window you share, e.g. to
+> watch YouTube videos together or show a terminal. See [Window sharing](#can-other-players-see-my-windows-window-sharing)
+> below and [TODO-SHARING.md](TODO-SHARING.md). Ported from
+> [meltingscales/waylandcraft-neoforge-1.21.1](https://github.com/meltingscales/waylandcraft-neoforge-1.21.1),
+> written with major help from an LLM (Claude Code).
+
 ## System dependencies
 - OS: Linux
 - Minecraft 26.2
@@ -13,6 +19,7 @@ Coming soon to a [Modrinth](https://modrinth.com/mod/waylandcraft_plus_plus) nea
 - xkbcommon library 1.11.0
 - xkbcommon tools (xkbcli)
 - xwayland-satellite (for Xwayland support)
+- For sharing window audio: PipeWire (`pw-record`, `pw-dump`), and `xprop` for X11 apps
 
 Additionally recommended:
 - Prism Launcher
@@ -42,9 +49,20 @@ If you have the binary installed on your system, it should automatically be star
 Move your mouse over the window, then activate the hard keyboard capture mode. (`ALT-Q`)
 Exiting the hard keyboard capture mode releases the mouse.
 
-### Will there be multiplayer support?
-Multiplayer support would require video streaming, a bunch of networking code and a rewrite of input handling,
-so it's not really planned right now.
+### Can other players see my windows? (window sharing)
+Yes, if you choose to share them. Sharing is read-only: others can watch and hear, but can't interact.
+1. Open the window manager (`B`), select the window's tab and click the **share** (broadcast) button. Click it again to stop.
+   `N` toggles sharing of the most recently focused window as a shortcut.
+2. Put the window's item in an item frame, or place the window in the world as usual. Other players see and hear it there.
+
+Shared windows get a red ● in the window manager's tabs, and the HUD lists everything you share.
+Video is only sent while someone can actually see the window. Audio (the shared app's own PipeWire stream, never
+your microphone) plays in stereo from the window to players within 24 blocks. The server needs this mod for sharing;
+players on any OS can watch.
+
+To try it alone, run `/waylandcraft testpattern` (needs cheats): it spawns a test window with color bars and a beep
+every second (the border flashes with each beep, and beeps alternate left/right). `/waylandcraft testpattern stop`
+removes it. Design notes and known limitations are in [TODO-SHARING.md](TODO-SHARING.md).
 
 ### But can I use it on a server though?
 You can, but because it's a client-side mod, other players won't see your windows or be able to interact with them.
@@ -66,7 +84,9 @@ This is because for the shader support windows are rendered with the same pipeli
 For some shaders you might need to disable features like Temporal Anti Aliasing (TAA).
 
 ## Building and Running
-You need a Rust development environment and a Java 25 SDK.
+You need a Rust development environment and a Java 25 SDK, plus `x264` (library and headers), `clang`/`libclang`
+and `pkg-config` for the native library's window sharing encoder (release builds link x264 statically; see
+[TODO-SHARING.md](TODO-SHARING.md#building)).
 ```sh
 ./build.sh #all arguments are passed to cargo build
 ```

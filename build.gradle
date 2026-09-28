@@ -12,6 +12,7 @@ base {
 }
 
 repositories {
+	mavenCentral()
 	// Add repositories to retrieve artifacts from in here.
 	// You should only use this when depending on other mods because
 	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
@@ -55,6 +56,11 @@ dependencies {
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 	compileOnly "maven.modrinth:iris:${project.iris_version}"
+
+	// Window sharing: pure-Java H.264 (JCodec) and Opus (Concentus), bundled in the jar
+	// so every client can decode shared windows
+	implementation include("org.jcodec:jcodec:${project.jcodec_version}")
+	implementation include("io.github.jaredmdobson:concentus:${project.concentus_version}")
 	compileOnly "eu.pb4:polymer-core:${project.polymer_version}"
 	compileOnly "eu.pb4:polymer-resource-pack:${project.polymer_version}"
 }

@@ -2,6 +2,7 @@ package dev.evvie.waylandcraft.gui;
 
 import java.awt.Color;
 import java.util.Calendar;
+import java.util.List;
 
 import org.joml.Matrix3x2fStack;
 
@@ -32,6 +33,7 @@ public class WaylandHudRenderer {
 	private static final Identifier APP_LIST = Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "app-list");
 	private static final Identifier PINNED_TOPLEVEL = Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "pinned-toplevel");
 	private static final Identifier DND_ICON = Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "dnd-icon");
+	private static final Identifier SHARING = Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "sharing");
 	
 	public WaylandHudRenderer(WaylandCraft wlc) {
 		this.wlc = wlc;
@@ -42,6 +44,7 @@ public class WaylandHudRenderer {
 		HudElementRegistry.attachElementAfter(VanillaHudElements.BOSS_BAR, APP_LIST, this::extractAppListRenderState);
 		HudElementRegistry.attachElementAfter(VanillaHudElements.BOSS_BAR, PINNED_TOPLEVEL, this::extractPinnedToplevelRenderState);
 		HudElementRegistry.attachElementAfter(VanillaHudElements.BOSS_BAR, DND_ICON, this::extractDNDIconRenderState);
+		HudElementRegistry.attachElementAfter(VanillaHudElements.BOSS_BAR, SHARING, this::extractSharingRenderState);
 	}
 	
 	private void extractAppListRenderState(GuiGraphicsExtractor context, DeltaTracker deltaTracker) {
@@ -134,6 +137,22 @@ public class WaylandHudRenderer {
 			stack.scale(1.0f / guiScale, 1.0f / guiScale);
 			RenderUtils.renderFramebuffer2D(context, buf, x, y, w, h);
 			stack.popMatrix();
+		}
+	}
+	
+	// Always-visible list of windows shared with other players
+	private void extractSharingRenderState(GuiGraphicsExtractor context, DeltaTracker deltaTracker) {
+		List<String> titles = wlc.sharingOwner.sharedTitles();
+		if(titles.isEmpty()) return;
+		
+		Font font = Minecraft.getInstance().font;
+		int maxWidth = context.guiWidth() / 3;
+		int y = 4 + font.lineHeight;
+		for(String title : titles) {
+			String text = "\u25CF Sharing: " + title;
+			if(font.width(text) > maxWidth) text = font.plainSubstrByWidth(text, maxWidth - font.width("...")) + "...";
+			context.text(font, text, context.guiWidth() - font.width(text) - 2, y, 0xFFFF5555, true);
+			y += font.lineHeight + 1;
 		}
 	}
 	
