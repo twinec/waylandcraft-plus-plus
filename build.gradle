@@ -190,71 +190,98 @@ tasks.modrinth.onlyIf {
 tasks.modrinth.dependsOn tasks.build
 
 // TEMPORARY diagnostic task for the 26.3 port (see project thread "Port to 26.3").
-// Lists the real com.mojang.renderpearl.* / SDL / DynamicGpuDataStorage class layout
-// from the resolved 26.3 dependency jars, and runs javap on a curated set of classes
-// we expect to need, so the port can be written against real signatures instead of
-// guesses. Remove this task (and the build.yml step pointing at it) once the port is done.
+// Round 2: round 1 found the real com.mojang.renderpearl.* package layout (api/,
+// backend/{opengl,vulkan,common,api}/, frontend/, util/) but none of our guessed
+// subpackages (pipeline/, textures/, buffers/, systems/, opengl/, vulkan/, vertex/,
+// platform/) existed under it, and several classes (PoseStack, BufferBuilder,
+// TextureTarget, RenderSystem, Window, NativeImage, Std140Builder, ...) weren't
+// under renderpearl at all. This round lists whatever's left under com.mojang.blaze3d
+// and locates those classes anywhere on the classpath by simple name, then runs javap
+// on both the confirmed renderpearl classes and whatever it finds for the rest.
+// Remove this task (and the build.yml step pointing at it) once the port is done.
 tasks.register("diagPort263") {
 	doLast {
 		def cp = sourceSets.main.compileClasspath.files
 
-		def javapCandidates = [
-			"com/mojang/renderpearl/pipeline/RenderPipeline.class",
-			"com/mojang/renderpearl/pipeline/BindGroupLayout.class",
-			"com/mojang/renderpearl/pipeline/ColorTargetState.class",
-			"com/mojang/renderpearl/pipeline/DepthStencilState.class",
-			"com/mojang/renderpearl/pipeline/BlendFunction.class",
-			"com/mojang/renderpearl/pipeline/TextureTarget.class",
-			"com/mojang/renderpearl/pipeline/RenderTarget.class",
-			"com/mojang/renderpearl/textures/GpuTexture.class",
-			"com/mojang/renderpearl/textures/GpuTextureView.class",
-			"com/mojang/renderpearl/textures/GpuSampler.class",
-			"com/mojang/renderpearl/textures/FilterMode.class",
-			"com/mojang/renderpearl/textures/AddressMode.class",
-			"com/mojang/renderpearl/buffers/GpuBuffer.class",
-			"com/mojang/renderpearl/buffers/GpuBufferSlice.class",
-			"com/mojang/renderpearl/buffers/Std140Builder.class",
-			"com/mojang/renderpearl/buffers/Std140SizeCalculator.class",
-			"com/mojang/renderpearl/shaders/UniformType.class",
-			"com/mojang/renderpearl/systems/GpuDevice.class",
-			"com/mojang/renderpearl/systems/GpuDeviceBackend.class",
-			"com/mojang/renderpearl/systems/RenderPass.class",
-			"com/mojang/renderpearl/systems/RenderSystem.class",
-			"com/mojang/renderpearl/systems/CommandEncoder.class",
-			"com/mojang/renderpearl/opengl/GlDevice.class",
-			"com/mojang/renderpearl/opengl/GlTexture.class",
-			"com/mojang/renderpearl/opengl/GlStateManager.class",
-			"com/mojang/renderpearl/opengl/FrameBufferCache.class",
-			"com/mojang/renderpearl/vulkan/VulkanDevice.class",
-			"com/mojang/renderpearl/vulkan/VulkanGpuBuffer.class",
-			"com/mojang/renderpearl/vulkan/VulkanGpuTexture.class",
-			"com/mojang/renderpearl/vulkan/VulkanCommandEncoder.class",
-			"com/mojang/renderpearl/vertex/PoseStack.class",
-			"com/mojang/renderpearl/vertex/BufferBuilder.class",
-			"com/mojang/renderpearl/vertex/ByteBufferBuilder.class",
-			"com/mojang/renderpearl/vertex/MeshData.class",
-			"com/mojang/renderpearl/vertex/DefaultVertexFormat.class",
-			"com/mojang/renderpearl/platform/Window.class",
-			"com/mojang/renderpearl/platform/InputConstants.class",
-			"com/mojang/renderpearl/platform/NativeImage.class",
-			"com/mojang/renderpearl/GpuFormat.class",
-			"com/mojang/renderpearl/PrimitiveTopology.class",
-			"com/mojang/renderpearl/IndexType.class",
+		def knownCandidates = [
+			"com/mojang/renderpearl/api/GpuFormat.class",
+			"com/mojang/renderpearl/api/pipeline/PrimitiveTopology.class",
+			"com/mojang/renderpearl/api/pipeline/IndexType.class",
+			"com/mojang/renderpearl/api/pipeline/RenderPipeline.class",
+			"com/mojang/renderpearl/api/pipeline/BindGroupLayout.class",
+			"com/mojang/renderpearl/api/pipeline/ColorTargetState.class",
+			"com/mojang/renderpearl/api/pipeline/DepthStencilState.class",
+			"com/mojang/renderpearl/api/pipeline/BlendFunction.class",
+			"com/mojang/renderpearl/api/pipeline/BlendFactor.class",
+			"com/mojang/renderpearl/api/pipeline/BlendEquation.class",
+			"com/mojang/renderpearl/api/pipeline/BlendOp.class",
+			"com/mojang/renderpearl/api/pipeline/CompareOp.class",
+			"com/mojang/renderpearl/api/pipeline/PolygonMode.class",
+			"com/mojang/renderpearl/api/pipeline/UniformType.class",
+			"com/mojang/renderpearl/api/pipeline/ShaderType.class",
+			"com/mojang/renderpearl/api/pipeline/ShaderSource.class",
+			"com/mojang/renderpearl/api/pipeline/CompiledRenderPipeline.class",
+			"com/mojang/renderpearl/api/buffers/GpuBuffer.class",
+			"com/mojang/renderpearl/api/buffers/GpuBufferSlice.class",
+			"com/mojang/renderpearl/api/buffers/TransientMemory.class",
+			"com/mojang/renderpearl/api/textures/GpuTexture.class",
+			"com/mojang/renderpearl/api/textures/GpuTextureView.class",
+			"com/mojang/renderpearl/api/textures/GpuSampler.class",
+			"com/mojang/renderpearl/api/textures/FilterMode.class",
+			"com/mojang/renderpearl/api/textures/AddressMode.class",
+			"com/mojang/renderpearl/api/device/GpuDevice.class",
+			"com/mojang/renderpearl/api/device/GpuSurface.class",
+			"com/mojang/renderpearl/api/device/DeviceFeatures.class",
+			"com/mojang/renderpearl/api/commands/CommandEncoder.class",
+			"com/mojang/renderpearl/api/commands/RenderPass.class",
+			"com/mojang/renderpearl/api/commands/RenderPassDescriptor.class",
+			"com/mojang/renderpearl/api/vertex/VertexFormat.class",
+			"com/mojang/renderpearl/api/vertex/VertexFormatElement.class",
+			"com/mojang/renderpearl/backend/api/GpuDeviceBackend.class",
+			"com/mojang/renderpearl/backend/api/CommandEncoderBackend.class",
+			"com/mojang/renderpearl/backend/api/BackendRenderPipeline.class",
+			"com/mojang/renderpearl/backend/api/RenderPassBackend.class",
+			"com/mojang/renderpearl/backend/opengl/GlDevice.class",
+			"com/mojang/renderpearl/backend/opengl/GlTexture.class",
+			"com/mojang/renderpearl/backend/opengl/GlStateManager.class",
+			"com/mojang/renderpearl/backend/opengl/FrameBufferCache.class",
+			"com/mojang/renderpearl/backend/opengl/GlCommandEncoder.class",
+			"com/mojang/renderpearl/backend/opengl/GlRenderPass.class",
+			"com/mojang/renderpearl/backend/vulkan/VulkanDevice.class",
+			"com/mojang/renderpearl/backend/vulkan/VulkanGpuBuffer.class",
+			"com/mojang/renderpearl/backend/vulkan/VulkanGpuTexture.class",
+			"com/mojang/renderpearl/backend/vulkan/VulkanCommandEncoder.class",
+			"com/mojang/renderpearl/backend/vulkan/VulkanRenderPass.class",
+			"com/mojang/renderpearl/backend/common/BaseGpuTexture.class",
+			"com/mojang/renderpearl/backend/common/BaseGpuBuffer.class",
+			"com/mojang/renderpearl/backend/common/BaseGpuTextureView.class",
+			"com/mojang/renderpearl/frontend/FrontendGpuDevice.class",
+			"com/mojang/renderpearl/frontend/FrontendCommandEncoder.class",
+			"com/mojang/renderpearl/frontend/FrontendRenderPass.class",
+			"com/mojang/renderpearl/frontend/FrontendRenderPipeline.class",
 			"net/minecraft/client/renderer/DynamicGpuDataStorage.class",
 			"net/minecraft/client/renderer/DynamicGpuDataStorageMapped.class",
 			"net/minecraft/client/renderer/DynamicGpuDataStorageNonMapped.class",
 			"net/minecraft/client/renderer/UniformValue.class",
+			"net/minecraft/client/renderer/DynamicGpuData.class",
+			"net/minecraft/client/renderer/GlobalSettingsUniform.class",
 		] as Set
 
-		def tmpDir = new File(project.layout.buildDirectory.get().asFile, "diag-extract")
+		// Classes round 1 didn't find under renderpearl -- locate by simple name, wherever they are.
+		def searchNames = [
+			"PoseStack.class", "BufferBuilder.class", "ByteBufferBuilder.class", "MeshData.class",
+			"DefaultVertexFormat.class", "VertexConsumer.class", "TextureTarget.class", "RenderTarget.class",
+			"Window.class", "InputConstants.class", "NativeImage.class", "RenderSystem.class",
+			"Std140Builder.class", "Std140SizeCalculator.class", "AutoStorageIndexBuffer.class",
+		] as Set
+
+		def tmpDir = new File(project.layout.buildDirectory.get().asFile, "diag-extract2")
 		tmpDir.deleteDir()
 		tmpDir.mkdirs()
 
-		def renderpearlClasses = new TreeSet<String>()
-		def sdlEntries = new TreeSet<String>()
-		def glfwEntries = new TreeSet<String>()
-		def uniformEntries = new TreeSet<String>()
+		def blaze3dClasses = new TreeSet<String>()
 		def foundIn = [:]
+		def foundByName = [:]
 
 		cp.each { f ->
 			if(!f.exists() || !f.name.endsWith(".jar")) return
@@ -263,39 +290,36 @@ tasks.register("diagPort263") {
 				try {
 					zip.entries().each { entry ->
 						def name = entry.name
-						if(name.startsWith("com/mojang/renderpearl/") && name.endsWith(".class") && !name.contains('$')) {
-							renderpearlClasses.add(name)
+						if(!name.endsWith(".class")) return
+						if(name.startsWith("com/mojang/blaze3d/") && !name.contains('$')) {
+							blaze3dClasses.add(name)
 						}
-						if(name.startsWith("org/lwjgl/") && name.toLowerCase().contains("sdl") && name.endsWith(".class")) {
-							sdlEntries.add(name)
-						}
-						if(name.startsWith("org/lwjgl/glfw/") && name.endsWith(".class")) {
-							glfwEntries.add(name)
-						}
-						if(name.startsWith("net/minecraft/client/renderer/") && (name.contains("Uniform") || name.contains("DynamicGpuData")) && name.endsWith(".class")) {
-							uniformEntries.add(name)
-						}
-						if(javapCandidates.contains(name) && !foundIn.containsKey(name)) {
+						if(knownCandidates.contains(name) && !foundIn.containsKey(name)) {
 							foundIn[name] = f
+						}
+						def simple = name.substring(name.lastIndexOf('/') + 1)
+						if(searchNames.contains(simple)) {
+							foundByName.computeIfAbsent(simple, { new TreeSet<String>() }).add(name)
+							if(!foundIn.containsKey(name)) foundIn[name] = f
 						}
 					}
 				} finally {
 					zip.close()
 				}
 			} catch(Exception e) {
-				println "DIAG:ZIP_ERROR:${f}:${e}"
+				println "DIAG2:ZIP_ERROR:${f}:${e}"
 			}
 		}
 
-		println "DIAG_BEGIN"
-		println "DIAG:RENDERPEARL_CLASS_COUNT=${renderpearlClasses.size()}"
-		renderpearlClasses.each { println "DIAG:RP_CLASS:${it}" }
-		println "DIAG:SDL_COUNT=${sdlEntries.size()}"
-		sdlEntries.each { println "DIAG:SDL_CLASS:${it}" }
-		println "DIAG:GLFW_COUNT=${glfwEntries.size()}"
-		glfwEntries.each { println "DIAG:GLFW_CLASS:${it}" }
-		println "DIAG:UNIFORM_COUNT=${uniformEntries.size()}"
-		uniformEntries.each { println "DIAG:UNIFORM_CLASS:${it}" }
+		println "DIAG2_BEGIN"
+		println "DIAG2:BLAZE3D_REMAINING_COUNT=${blaze3dClasses.size()}"
+		blaze3dClasses.each { println "DIAG2:BLAZE3D_CLASS:${it}" }
+		foundByName.each { simple, paths ->
+			paths.each { p -> println "DIAG2:FOUND_BY_NAME:${simple}::${p}" }
+		}
+		searchNames.each { simple ->
+			if(!foundByName.containsKey(simple)) println "DIAG2:NOT_FOUND_BY_NAME:${simple}"
+		}
 
 		foundIn.each { name, jarFile ->
 			try {
@@ -310,22 +334,19 @@ tasks.register("diagPort263") {
 					def binaryName = name.replace('/', '.').replace('.class', '')
 					def proc = ["javap", "-p", "-classpath", classDir.absolutePath, binaryName].execute()
 					proc.waitFor()
-					println "DIAG_JAVAP_BEGIN:${name}"
-					proc.in.eachLine { line -> println "DIAG:JAVAP:${name}::${line}" }
-					proc.err.eachLine { line -> println "DIAG:JAVAP_ERR:${name}::${line}" }
-					println "DIAG_JAVAP_END:${name}"
+					println "DIAG2_JAVAP_BEGIN:${name}"
+					proc.in.eachLine { line -> println "DIAG2:JAVAP:${name}::${line}" }
+					proc.err.eachLine { line -> println "DIAG2:JAVAP_ERR:${name}::${line}" }
+					println "DIAG2_JAVAP_END:${name}"
 				} finally {
 					zip.close()
 				}
 			} catch(Exception e) {
-				println "DIAG:JAVAP_EXCEPTION:${name}:${e}"
+				println "DIAG2:JAVAP_EXCEPTION:${name}:${e}"
 			}
 		}
 
-		def missing = javapCandidates - foundIn.keySet()
-		missing.each { println "DIAG:NOT_FOUND:${it}" }
-
-		println "DIAG_END"
+		println "DIAG2_END"
 	}
 }
 
