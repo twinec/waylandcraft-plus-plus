@@ -41,6 +41,9 @@ import dev.evvie.waylandcraft.render.WindowInItemFrameRenderer;
 import dev.evvie.waylandcraft.render.model.WindowItemModel;
 import dev.evvie.waylandcraft.settings.WaylandCraftSettings;
 import dev.evvie.waylandcraft.settings.WaylandCraftSettingsManager;
+import dev.evvie.waylandcraft.sharing.SharingNetworking;
+import dev.evvie.waylandcraft.sharing.SharingOwner;
+import dev.evvie.waylandcraft.sharing.SharingViewer;
 import dev.evvie.waylandcraft.utils.CursorShape;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -99,6 +102,10 @@ public class WaylandCraft implements ClientModInitializer {
 	public KeyMapping keyOpenScreen;
 	public KeyMapping keyOpenAppLauncher;
 	public KeyMapping keyCaptureKeyboard;
+	public KeyMapping keyToggleSharing;
+	
+	public SharingOwner sharingOwner = new SharingOwner(this);
+	public SharingViewer sharingViewer = new SharingViewer();
 	
 	public WindowInHandRenderer windowInHandRenderer = new WindowInHandRenderer();
 	public WindowInItemFrameRenderer windowInItemFrameRenderer = new WindowInItemFrameRenderer();
@@ -137,10 +144,20 @@ public class WaylandCraft implements ClientModInitializer {
 		keyOpenScreen = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.windowManager", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_B, KEYBIND_CATEGORY));
 		keyOpenAppLauncher = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.appLauncher", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_V, KEYBIND_CATEGORY));
 		keyCaptureKeyboard = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.captureKeyboard", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G, KEYBIND_CATEGORY));
+		keyToggleSharing = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.toggleSharing", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_N, KEYBIND_CATEGORY));
 		
 		WindowItemModel.register();
 		
 		settingsManager = new WaylandCraftSettingsManager(this);
+		
+		// Watching windows other players share is pure Java, so it works on every platform
+		SharingNetworking.registerClient();
+		LevelRenderEvents.COLLECT_SUBMITS.register((ctx) -> {
+			sharingViewer.presentFrames();
+			sharingViewer.renderFloating(ctx.poseStack(), ctx.submitNodeCollector(), ctx.levelState().cameraRenderState.pos);
+		});
+		ClientTickEvents.END_CLIENT_TICK.register((minecraft) -> sharingViewer.tick());
+		ClientPlayConnectionEvents.DISCONNECT.register((listener, minecraft) -> sharingViewer.reset());
 		
 		if(Platform.get() != Platform.LINUX) {
 			WaylandCraftCommon.LOGGER.error("Invalid platform detected! Most mod features will be disabled");
@@ -155,6 +172,7 @@ public class WaylandCraft implements ClientModInitializer {
 		ClientPlayConnectionEvents.DISCONNECT.register(this::onClientDisconnect);
 		ItemTooltipCallback.EVENT.register(this::addWindowItemTooltip);
 		ClientTickEvents.START_CLIENT_TICK.register(itemManager);
+		ClientTickEvents.END_CLIENT_TICK.register((minecraft) -> sharingOwner.tick());
 		
 		WaylandCraftCommon.instance.windowItemInteractionProvider = itemManager;
 		
@@ -180,6 +198,7 @@ public class WaylandCraft implements ClientModInitializer {
 			WaylandCraftCommon.LOGGER.info("Xwayland started on " + x11Display);
 		}
 		bridge.update();
+		sharingOwner.captureFrames();
 	}
 	
 	private void registerSettingsResponders() {
@@ -301,6 +320,9 @@ public class WaylandCraft implements ClientModInitializer {
 		else if(keyCaptureKeyboard.consumeClick()) {
 			enableKeyboardCapture(false);
 		}
+		else if(keyToggleSharing.consumeClick()) {
+			sharingOwner.toggleFocused();
+		}
 	}
 	
 	private void onClientJoin(ClientPacketListener listener, PacketSender sender, Minecraft minecraft) {
@@ -312,6 +334,7 @@ public class WaylandCraft implements ClientModInitializer {
 	private void onClientDisconnect(ClientPacketListener listener, Minecraft minecraft) {
 		displays.clear();
 		itemManager.reset();
+		sharingOwner.reset();
 	}
 	
 	@Nullable
