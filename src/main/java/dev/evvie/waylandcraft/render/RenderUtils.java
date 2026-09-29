@@ -53,6 +53,7 @@ public class RenderUtils {
 	private static final RenderPipeline WINDOW_CUTOUT_PIPELINE = RenderPipeline.builder(WINDOW_PIPELINE_SNIPPET)
 			.withLocation(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "pipeline/window_cutout"))
 			.withShaderDefine("ALPHA_CUTOUT")
+			.withColorTargetState(ColorTargetState.DEFAULT)
 			.build();
 	
 	private static final RenderPipeline WINDOW_TRANSLUCENT_PIPELINE = RenderPipeline.builder(WINDOW_PIPELINE_SNIPPET)
@@ -64,6 +65,7 @@ public class RenderUtils {
 			.withLocation(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "pipeline/window_cutout"))
 			.withShaderDefine("ALPHA_CUTOUT")
 			.withShaderDefine("RGSS")
+			.withColorTargetState(ColorTargetState.DEFAULT)
 			.build();
 	
 	private static final RenderPipeline WINDOW_TRANSLUCENT_ANTIALIASING_PIPELINE = RenderPipeline.builder(WINDOW_PIPELINE_SNIPPET)
@@ -76,6 +78,7 @@ public class RenderUtils {
 			.withLocation(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "pipeline/window_cutout_background"))
 			.withShaderDefine("ALPHA_CUTOUT")
 			.withShaderDefine("NO_COLOR")
+			.withColorTargetState(ColorTargetState.DEFAULT)
 			.build();
 	
 	private static final RenderPipeline WINDOW_TRANSLUCENT_BACKGROUND_PIPELINE = RenderPipeline.builder(WINDOW_PIPELINE_SNIPPET)
