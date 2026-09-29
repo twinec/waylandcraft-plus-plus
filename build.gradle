@@ -190,15 +190,14 @@ tasks.modrinth.onlyIf {
 tasks.modrinth.dependsOn tasks.build
 
 // TEMPORARY diagnostic task for the 26.3 port (see project thread "Port to 26.3").
-// Round 4a confirmed: InputConstants (still at com.mojang.blaze3d.platform.InputConstants)
-// now has its own named KEY_*/MOD_*/PRESS/RELEASE/REPEAT constants and a Window-less
-// isKeyDown(int) - GLFW key codes/actions are gone from it entirely, and
-// InputConstants.Type only has KEYBOARD/MOUSE (no more KEYSYM). Also got the full
-// org/lwjgl/sdl/* class list (SDLVideo, SDLHints, SDLMouse, SDLKeyboard, SDLScancode,
-// SDLEvents, SDLInit, etc, one class per SDL header). Round 4b javaps SDLVideo/SDLHints/
-// SDLMouse specifically to find the EGL context-creation hint and cursor-mode/relative-
-// mouse and video-driver-detection functions needed to replace glfwWindowHint(...EGL...),
-// glfwSetInputMode(GLFW_CURSOR...), glfwGetCursorPos and glfwGetPlatform()==WAYLAND.
+// Round 4a confirmed InputConstants's new named KEY_*/MOD_*/PRESS/RELEASE/REPEAT
+// constants and Window-less isKeyDown(int), and the full org/lwjgl/sdl/* class list.
+// Round 4b confirmed SDLHints.SDL_HINT_VIDEO_FORCE_EGL + SDL_SetHint(CharSequence,
+// CharSequence), and SDLMouse's SDL_SetWindowRelativeMouseMode/SDL_GetMouseState
+// (now applied to GlBackendMixin and WindowManagerScreen). Round 4c javaps SDLVideo
+// (window creation/EGL proc address/video driver detection), SDLInit, and
+// com.mojang.renderpearl.backend.opengl.GlBackend (to confirm the "setWindowHints"
+// mixin injection point this mod hooks still exists under that name/signature).
 // Remove this task (and the build.yml step pointing at it) once the port is done.
 tasks.register("diagPort263") {
 	doLast {
@@ -206,11 +205,11 @@ tasks.register("diagPort263") {
 
 		def knownCandidates = [
 			"org/lwjgl/sdl/SDLVideo.class",
-			"org/lwjgl/sdl/SDLHints.class",
-			"org/lwjgl/sdl/SDLMouse.class",
+			"org/lwjgl/sdl/SDLInit.class",
+			"com/mojang/renderpearl/backend/opengl/GlBackend.class",
 		] as Set
 
-		def searchNamePatterns = [] // round 4b: javap the specific SDL classes named above only
+		def searchNamePatterns = [] // round 4c: javap SDLVideo/SDLInit/GlBackend
 
 		def tmpDir = new File(project.layout.buildDirectory.get().asFile, "diag-extract2")
 		tmpDir.deleteDir()

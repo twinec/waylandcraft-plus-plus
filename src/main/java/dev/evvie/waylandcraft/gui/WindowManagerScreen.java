@@ -8,7 +8,10 @@ import java.util.Optional;
 
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2fStack;
-import org.lwjgl.glfw.GLFW;
+import org.lwjgl.sdl.SDLMouse;
+import org.lwjgl.system.MemoryStack;
+
+import com.mojang.blaze3d.platform.InputConstants;
 
 import dev.evvie.waylandcraft.WaylandCraft;
 import dev.evvie.waylandcraft.WaylandCraftCommon;
@@ -214,7 +217,7 @@ public class WindowManagerScreen extends Screen {
 		if(focused == null || focused.fullscreen) return;
 		
 		wlc.bridge.sendMotionOutside();
-		GLFW.glfwSetInputMode(Minecraft.getInstance().getWindow().handle(), GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+		SDLMouse.SDL_SetWindowRelativeMouseMode(Minecraft.getInstance().getWindow().handle(), true);
 		
 		resizeMode = true;
 		resizeToplevel = focused;
@@ -259,17 +262,22 @@ public class WindowManagerScreen extends Screen {
 		if(resizeToplevel != null && resizeToplevel.isAlive()) wlc.bridge.resizeToplevel(resizeToplevel, resizeWidth, resizeHeight);
 		
 		long window = Minecraft.getInstance().getWindow().handle();
-		GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
-		
+		SDLMouse.SDL_SetWindowRelativeMouseMode(window, false);
+
 		/* <HACK> */
 		/* The following code makes the game remember at what position the cursor is after it was moved in disabled mode during resize */
-		double mouseX[] = new double[1];
-		double mouseY[] = new double[1];
-		GLFW.glfwGetCursorPos(window, mouseX, mouseY);
-		
+		double mouseX, mouseY;
+		try(MemoryStack stack = MemoryStack.stackPush()) {
+			var mouseXBuf = stack.floats(0f);
+			var mouseYBuf = stack.floats(0f);
+			SDLMouse.SDL_GetMouseState(mouseXBuf, mouseYBuf);
+			mouseX = mouseXBuf.get(0);
+			mouseY = mouseYBuf.get(0);
+		}
+
 		MouseHandler mouseHandler = Minecraft.getInstance().mouseHandler;
 		mouseHandler.setIgnoreFirstMove(); // don't accumulate any movement in accumulatedDX,DY
-		((IMouseHandlerMixin) mouseHandler).invokeOnMove(window, mouseX[0], mouseY[0]);
+		((IMouseHandlerMixin) mouseHandler).invokeOnMove(window, mouseX, mouseY);
 		/* </HACK> */
 		
 		resizeMode = false;
@@ -536,12 +544,12 @@ public class WindowManagerScreen extends Screen {
 	
 	@Override
 	public boolean keyPressed(KeyEvent event) {
-		if(event.key() == GLFW.GLFW_KEY_ESCAPE && !captureModeEnabled) {
+		if(event.key() == InputConstants.KEY_ESCAPE && !captureModeEnabled) {
 			this.onClose();
 			return true;
 		}
-		
-		if(event.key() == GLFW.GLFW_KEY_Q && event.modifiers() == GLFW.GLFW_MOD_ALT) {
+
+		if(event.key() == InputConstants.KEY_Q && event.modifiers() == InputConstants.MOD_ALT) {
 			captureModeEnabled = !captureModeEnabled;
 			return true;
 		}

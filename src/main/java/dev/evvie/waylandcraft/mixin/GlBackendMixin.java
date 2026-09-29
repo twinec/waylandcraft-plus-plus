@@ -1,6 +1,6 @@
 package dev.evvie.waylandcraft.mixin;
 
-import org.lwjgl.glfw.GLFW;
+import org.lwjgl.sdl.SDLHints;
 import org.lwjgl.system.Platform;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -18,7 +18,7 @@ public class GlBackendMixin {
 	public void changeContextApi(CallbackInfo info) {
 		if(Platform.get() != Platform.LINUX) return;
 		if(!EglAvailability.probe()) return;
-		GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_CREATION_API, GLFW.GLFW_EGL_CONTEXT_API);
+		SDLHints.SDL_SetHint(SDLHints.SDL_HINT_VIDEO_FORCE_EGL, "1");
 	}
 
 }
