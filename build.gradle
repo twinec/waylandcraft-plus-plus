@@ -187,6 +187,81 @@ tasks.modrinth.onlyIf {
 	ready
 }
 
+// TEMPORARY: diagnostic task for the 26.3 port -- probes real API shapes that
+// javac errors alone don't fully reveal. Not meant to survive past the port.
+tasks.register("diagPort263c") {
+	doLast {
+		def outDir = project.layout.buildDirectory.dir("diagPort263c").get().asFile
+		outDir.mkdirs()
+		def cp = sourceSets.main.compileClasspath.files
+
+		println "DIAG4_SEARCH_BEGIN"
+		cp.each { jarFile ->
+			if(!jarFile.name.endsWith(".jar")) return
+			try {
+				new java.util.zip.ZipFile(jarFile).withCloseable { zf ->
+					zf.entries().each { entry ->
+						if(entry.name.contains("ItemInHandRenderer")) {
+							println "DIAG4:FOUND:${jarFile.name}:${entry.name}"
+						}
+					}
+				}
+			} catch(Exception e) {}
+		}
+		println "DIAG4_SEARCH_END"
+
+		def targets = [
+			"net.minecraft.client.input.KeyEvent": null,
+			"com.mojang.blaze3d.pipeline.TextureTarget": null,
+			"com.mojang.renderpearl.api.pipeline.RenderPipeline": ["Compiled", "class ", "interface "],
+			"com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline": null,
+			"net.minecraft.client.renderer.RenderPipelines": ["register"],
+			"com.mojang.renderpearl.api.commands.RenderPass": ["bindTexture", "setPipeline", "Sampler", "Texture"],
+			"net.minecraft.client.renderer.BindGroupLayouts": ["MATRICES", "PROJECTION", "Projection"],
+			"net.minecraft.client.renderer.entity.EntityRenderDispatcher": ["ItemInHand", "itemInHand", "Item"],
+			"net.minecraft.client.renderer.GameRenderer": ["ItemInHand", "itemInHand"],
+		]
+
+		targets.each { className, filterKeywords ->
+			def simpleName = className.substring(className.lastIndexOf('.') + 1)
+			def tempDir = new File(outDir, simpleName)
+			tempDir.mkdirs()
+			def found = false
+			for(jarFile in cp) {
+				if(!jarFile.name.endsWith(".jar")) continue
+				try {
+					new java.util.zip.ZipFile(jarFile).withCloseable { zf ->
+						def entryName = className.replace('.', '/') + ".class"
+						def entry = zf.getEntry(entryName)
+						if(entry != null) {
+							def outFile = new File(tempDir, "${simpleName}.class")
+							outFile.bytes = zf.getInputStream(entry).bytes
+							found = true
+						}
+					}
+				} catch(Exception e) {}
+			}
+			if(!found) {
+				println "DIAG4:NOTFOUND:${className}"
+				return
+			}
+			def baos = new ByteArrayOutputStream()
+			exec {
+				commandLine "javap", "-p", "-classpath", tempDir.absolutePath, className
+				standardOutput = baos
+				ignoreExitValue = true
+			}
+			println "DIAG4_JAVAP_BEGIN:${className}"
+			baos.toString().readLines().each { line ->
+				if(filterKeywords == null || filterKeywords.any { kw -> line.contains(kw) }) {
+					println "DIAG4:JAVAP:${className}::${line}"
+				}
+			}
+			println "DIAG4_JAVAP_END:${className}"
+		}
+	}
+}
+
 tasks.modrinth.dependsOn tasks.build
 
 // configure the maven publication

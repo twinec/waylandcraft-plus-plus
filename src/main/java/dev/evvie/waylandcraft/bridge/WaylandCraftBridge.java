@@ -17,7 +17,6 @@ import org.lwjgl.system.Platform;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.backend.api.GpuDeviceBackend;
-import com.mojang.renderpearl.backend.opengl.GlDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 
 import dev.evvie.waylandcraft.WaylandCraftCommon;
@@ -28,6 +27,7 @@ import dev.evvie.waylandcraft.bridge.dmabuf.DmabufFormat;
 import dev.evvie.waylandcraft.desktop.RawDesktopEntry;
 import dev.evvie.waylandcraft.egl.EGL;
 import dev.evvie.waylandcraft.egl.EGLHelper;
+import dev.evvie.waylandcraft.mixin.IGlDeviceMixin;
 import dev.evvie.waylandcraft.mixin.IGpuDeviceMixin;
 import dev.evvie.waylandcraft.render.BufferTexture;
 import dev.evvie.waylandcraft.render.BufferTexture.DmabufImportFailedException;
@@ -134,7 +134,7 @@ public class WaylandCraftBridge {
 	
 	private static DmabufFeedbackData initBackend() {
 		GpuDeviceBackend deviceBackend = ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend();
-		if(deviceBackend instanceof GlDevice) {
+		if(deviceBackend instanceof IGlDeviceMixin) {
 			return initBackendEGL();
 		}
 		else if(deviceBackend instanceof VulkanDevice) {

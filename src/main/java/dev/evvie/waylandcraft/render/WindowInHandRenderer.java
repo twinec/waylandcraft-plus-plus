@@ -1,5 +1,7 @@
 package dev.evvie.waylandcraft.render;
 
+import org.joml.Matrix4f;
+
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 
@@ -24,7 +26,7 @@ public class WindowInHandRenderer {
 		
 		if (!Minecraft.getInstance().player.isInvisible()) {
 			poseStack.pushPose();
-			poseStack.mulPose(Axis.ZP.rotationDegrees(h * 10.0f));
+			poseStack.mulPose(new Matrix4f().rotation(Axis.ZP.rotationDegrees(h * 10.0f)));
 			renderPlayerArm(poseStack, collector, light, handHeight, attack, humanoidArm);
 			poseStack.popPose();
 		}
@@ -37,8 +39,8 @@ public class WindowInHandRenderer {
 		float dy = 0.55f * Mth.sin(sattack * (float) (Math.PI * 2));
 		float dz = -0.6f * Mth.sin(attack * (float) Math.PI);
 		poseStack.translate(h * dx, dy - 0.3f * osci, dz);
-		poseStack.mulPose(Axis.XP.rotationDegrees(osci * -45.0f));
-		poseStack.mulPose(Axis.YP.rotationDegrees(h * osci * -30.0f));
+		poseStack.mulPose(new Matrix4f().rotation(Axis.XP.rotationDegrees(osci * -45.0f)));
+		poseStack.mulPose(new Matrix4f().rotation(Axis.YP.rotationDegrees(h * osci * -30.0f)));
 		
 		renderWindow(poseStack, collector, h, light, itemStack);
 		

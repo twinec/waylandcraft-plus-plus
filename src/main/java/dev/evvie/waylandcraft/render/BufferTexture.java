@@ -29,7 +29,6 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.backend.api.GpuDeviceBackend;
-import com.mojang.renderpearl.backend.opengl.GlDevice;
 import com.mojang.renderpearl.backend.opengl.GlStateManager;
 import com.mojang.renderpearl.backend.opengl.GlTexture;
 import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
@@ -42,6 +41,7 @@ import dev.evvie.waylandcraft.WaylandCraftCommon;
 import dev.evvie.waylandcraft.bridge.dmabuf.Dmabuf;
 import dev.evvie.waylandcraft.egl.EGL;
 import dev.evvie.waylandcraft.egl.EGLHelper;
+import dev.evvie.waylandcraft.mixin.IGlDeviceMixin;
 import dev.evvie.waylandcraft.mixin.IGlTextureMixin;
 import dev.evvie.waylandcraft.mixin.IGpuDeviceMixin;
 import dev.evvie.waylandcraft.mixin.IVulkanCommandEncoderMixin;
@@ -72,7 +72,7 @@ public abstract class BufferTexture {
 	
 	public static BufferTexture createShmTexture(long ptr, int width, int height, int format, int stride) {
 		GpuDeviceBackend deviceBackend = ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend();
-		if(deviceBackend instanceof GlDevice) {
+		if(deviceBackend instanceof IGlDeviceMixin) {
 			return new GlShmBufferTexture(ptr, width, height, format, stride);
 		}
 		else if(deviceBackend instanceof VulkanDevice) {
@@ -88,7 +88,7 @@ public abstract class BufferTexture {
 	
 	public static DmabufTexture createDmabufTexture(Dmabuf dmabuf) throws DmabufImportFailedException {
 		GpuDeviceBackend deviceBackend = ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend();
-		if(deviceBackend instanceof GlDevice) {
+		if(deviceBackend instanceof IGlDeviceMixin) {
 			return new GlDmabufTexture(dmabuf);
 		}
 		else if(deviceBackend instanceof VulkanDevice) {
@@ -140,7 +140,7 @@ public abstract class BufferTexture {
 			super(width, height, format);
 			this.id = GlStateManager._genTexture();
 			
-			texture = IGlTextureMixin.createTexture(GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, "buffertexture-" + this.hashCode(), GpuFormat.RGBA8_UINT, width, height, 1, 1, id, ((GlDevice) ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend()).frameBufferCache());
+			texture = IGlTextureMixin.createTexture(GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, "buffertexture-" + this.hashCode(), GpuFormat.RGBA8_UINT, width, height, 1, 1, id, ((IGlDeviceMixin) ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend()).invokeFrameBufferCache());
 			textureView = RenderSystem.getDevice().createTextureView(texture);
 		}
 		
@@ -225,7 +225,7 @@ public abstract class BufferTexture {
 				region.imageOffset().set(0, 0, 0);
 				region.imageExtent().set(width, height, 1);
 				VK12.vkCmdCopyBufferToImage(((IVulkanCommandEncoderMixin) commandEncoder).invokeCommandBuffer(), ((VulkanGpuBuffer) stagingBuffer.buffer()).vkBuffer(), texture.vkImage(), 1, region);
-				commandEncoder.memoryBarrier(stack);
+				((IVulkanCommandEncoderMixin) commandEncoder).invokeMemoryBarrier(stack);
 			}
 		}
 		
@@ -336,7 +336,7 @@ public abstract class BufferTexture {
 			long glEGLImageTargetTexture2DOES = SDLVideo.SDL_GL_GetProcAddress("glEGLImageTargetTexture2DOES");
 			JNI.invokeJV(GL33.GL_TEXTURE_2D, eglImage, glEGLImageTargetTexture2DOES);
 			
-			GlTexture glTexture = IGlTextureMixin.createTexture(GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, "eglimage-" + this.hashCode(), GpuFormat.RGBA8_UINT, width, height, 1, 1, eglImageTex, ((GlDevice) ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend()).frameBufferCache());
+			GlTexture glTexture = IGlTextureMixin.createTexture(GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, "eglimage-" + this.hashCode(), GpuFormat.RGBA8_UINT, width, height, 1, 1, eglImageTex, ((IGlDeviceMixin) ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend()).invokeFrameBufferCache());
 			internalTexture = glTexture;
 			internalView = RenderSystem.getDevice().createTextureView(internalTexture);
 		}
