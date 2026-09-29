@@ -207,3 +207,57 @@ publishing {
 		// retrieving dependencies.
 	}
 }
+
+// TEMPORARY diagnostic task -- lists BindGroupLayouts' static fields (to find the
+// correct constant for the DynamicTransforms uniform block) and dumps
+// PipelineBuilder's generateBackendCreateInfo to understand its uniform validation.
+// Remove before merging.
+tasks.register("diagBindGroup") {
+	doLast {
+		def targets = [
+			"net/minecraft/client/renderer/BindGroupLayouts.class": ["-p", "-constants"],
+			"com/mojang/renderpearl/frontend/shaders/PipelineBuilder.class": ["-p", "-c", "-constants"],
+		]
+		def files = sourceSets.main.compileClasspath.files + sourceSets.main.runtimeClasspath.files
+		def seen = new HashSet<String>()
+		def workDir = new File(buildDir, "diagBindGroupTmp")
+		workDir.deleteDir()
+		workDir.mkdirs()
+		files.each { f ->
+			if (!f.name.endsWith(".jar") || !f.exists()) return
+			try {
+				def zf = new java.util.zip.ZipFile(f)
+				try {
+					targets.keySet().each { entryName ->
+						def entry = zf.getEntry(entryName)
+						if (entry != null && seen.add(entryName)) {
+							def outFile = new File(workDir, entryName.replace('/', '_'))
+							outFile.parentFile.mkdirs()
+							outFile.bytes = zf.getInputStream(entry).getBytes()
+						}
+					}
+				} finally {
+					zf.close()
+				}
+			} catch (Exception e) {
+				// not a valid zip, skip
+			}
+		}
+		targets.each { entryName, flags ->
+			def className = entryName.replace('.class', '').replace('/', '.')
+			def outFile = new File(workDir, entryName.replace('/', '_'))
+			if (!outFile.exists()) {
+				println "DIAGBIND:NOTFOUND:${entryName}"
+				return
+			}
+			println "DIAGBIND_BEGIN:${className}"
+			def result = providers.exec {
+				commandLine(["javap"] + flags + ["-classpath", workDir.absolutePath, className])
+				ignoreExitValue = true
+			}
+			println result.standardOutput.asText.get()
+			println result.standardError.asText.get()
+			println "DIAGBIND_END:${className}"
+		}
+	}
+}
