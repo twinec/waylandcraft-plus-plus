@@ -9,9 +9,9 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.mojang.blaze3d.vulkan.VulkanBackend;
-import com.mojang.blaze3d.vulkan.VulkanPhysicalDevice;
-import com.mojang.blaze3d.vulkan.init.VulkanFeature;
+import com.mojang.renderpearl.backend.vulkan.VulkanBackend;
+import com.mojang.renderpearl.backend.vulkan.VulkanPhysicalDevice;
+import com.mojang.renderpearl.backend.vulkan.init.VulkanFeature;
 
 import dev.evvie.waylandcraft.WaylandCraftCommon;
 import dev.evvie.waylandcraft.vulkan.VulkanHelper;
@@ -20,8 +20,8 @@ import dev.evvie.waylandcraft.vulkan.VulkanHelper;
 public class VulkanBackendMixin {
 	
 	@WrapOperation(
-			method = "createDevice(JLcom/mojang/blaze3d/shaders/ShaderSource;Lcom/mojang/blaze3d/shaders/GpuDebugOptions;Ljava/lang/Runnable;)Lcom/mojang/blaze3d/systems/GpuDevice;",
-			at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vulkan/VulkanBackend;createDevice(Ljava/util/Collection;Lcom/mojang/blaze3d/vulkan/VulkanPhysicalDevice;Ljava/util/Set;)Lorg/lwjgl/vulkan/VkDevice;")
+			method = "createDevice(JLcom/mojang/renderpearl/api/pipeline/ShaderSource;Lcom/mojang/renderpearl/api/device/GpuDebugOptions;Ljava/lang/Runnable;)Lcom/mojang/renderpearl/backend/api/GpuDeviceBackend;",
+			at = @At(value = "INVOKE", target = "Lcom/mojang/renderpearl/backend/vulkan/VulkanBackend;createDevice(Ljava/util/Collection;Lcom/mojang/renderpearl/backend/vulkan/VulkanPhysicalDevice;Ljava/util/Set;)Lorg/lwjgl/vulkan/VkDevice;")
 	)
 	private VkDevice checkMoreVulkanExtensions(Collection<String> deviceExtensions, VulkanPhysicalDevice physicalDevice, Set<VulkanFeature> features, Operation<VkDevice> original) {
 		boolean hasNecessaryExtensions = true;

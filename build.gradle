@@ -190,44 +190,33 @@ tasks.modrinth.onlyIf {
 tasks.modrinth.dependsOn tasks.build
 
 // TEMPORARY diagnostic task for the 26.3 port (see project thread "Port to 26.3").
-// Round 3: rounds 1-2 confirmed the renderpearl package layout and that RenderSystem,
-// PoseStack/BufferBuilder/vertex, Window/InputConstants/NativeImage, TextureTarget and
-// Std140Builder all stayed in com.mojang.blaze3d unchanged. This round fills the last
-// gaps needed to write the actual port: RenderPipeline/BindGroupLayout builder methods,
-// DeviceInfo/DeviceType (to replace the now-private FrontendGpuDevice.backend field
-// access), and the writer-interface bound for DynamicGpuDataStorage<T>.
+// Round 4: rounds 1-3 confirmed the renderpearl package layout for the blaze3d->renderpearl
+// mechanical port (now done). This round investigates the GLFW->SDL migration: GLFW is
+// fully gone (org.lwjgl.glfw has 0 classes) and org.lwjgl.sdl has ~520 classes, but the
+// exact class/method names for keyboard scancodes, window creation and hints are unknown.
+// This lists every top-level org/lwjgl/sdl class, javaps InputConstants (confirmed still
+// at com.mojang.blaze3d.platform.InputConstants) to see its actual KEY_*/KEYSYM constants,
+// and javaps any SDL class whose simple name looks keyboard/event/window/hint related.
 // Remove this task (and the build.yml step pointing at it) once the port is done.
 tasks.register("diagPort263") {
 	doLast {
 		def cp = sourceSets.main.compileClasspath.files
 
 		def knownCandidates = [
-			"com/mojang/renderpearl/api/GpuFormat.class",
-			"com/mojang/renderpearl/api/pipeline/RenderPipeline\$Builder.class",
-			"com/mojang/renderpearl/api/pipeline/RenderPipeline\$Snippet.class",
-			"com/mojang/renderpearl/api/pipeline/BindGroupLayout\$Builder.class",
-			"com/mojang/renderpearl/api/pipeline/BindGroupLayout\$Entry.class",
-			"com/mojang/renderpearl/api/pipeline/PrimitiveTopology.class",
-			"com/mojang/renderpearl/api/pipeline/IndexType.class",
-			"com/mojang/renderpearl/api/pipeline/UniformType.class",
-			"com/mojang/renderpearl/api/pipeline/CompiledRenderPipeline.class",
-			"com/mojang/renderpearl/api/textures/GpuSampler.class",
-			"com/mojang/renderpearl/api/textures/FilterMode.class",
-			"com/mojang/renderpearl/api/textures/AddressMode.class",
-			"com/mojang/renderpearl/api/device/DeviceInfo.class",
-			"com/mojang/renderpearl/api/device/DeviceType.class",
-			"net/minecraft/client/renderer/DynamicGpuDataStorage\$DynamicGpuData.class",
+			"com/mojang/blaze3d/platform/InputConstants.class",
+			"com/mojang/blaze3d/platform/InputConstants\$Key.class",
+			"com/mojang/blaze3d/platform/InputConstants\$Type.class",
 		] as Set
 
-		def searchNames = [] as Set
+		def searchNamePatterns = ["key", "scancode", "keycode", "event", "hint", "window", "video", "init", "sdl.class"]
 
 		def tmpDir = new File(project.layout.buildDirectory.get().asFile, "diag-extract2")
 		tmpDir.deleteDir()
 		tmpDir.mkdirs()
 
-		def blaze3dClasses = new TreeSet<String>()
+		def sdlClasses = new TreeSet<String>()
 		def foundIn = [:]
-		def foundByName = [:]
+		def patternMatches = new TreeSet<String>()
 
 		cp.each { f ->
 			if(!f.exists() || !f.name.endsWith(".jar")) return
@@ -237,16 +226,18 @@ tasks.register("diagPort263") {
 					zip.entries().each { entry ->
 						def name = entry.name
 						if(!name.endsWith(".class")) return
-						if(name.startsWith("com/mojang/blaze3d/") && !name.contains('$')) {
-							blaze3dClasses.add(name)
+						if(name.startsWith("org/lwjgl/sdl/") && !name.contains('$')) {
+							sdlClasses.add(name)
 						}
 						if(knownCandidates.contains(name) && !foundIn.containsKey(name)) {
 							foundIn[name] = f
 						}
-						def simple = name.substring(name.lastIndexOf('/') + 1)
-						if(searchNames.contains(simple)) {
-							foundByName.computeIfAbsent(simple, { new TreeSet<String>() }).add(name)
-							if(!foundIn.containsKey(name)) foundIn[name] = f
+						if(name.startsWith("org/lwjgl/sdl/")) {
+							def simple = name.substring(name.lastIndexOf('/') + 1).toLowerCase()
+							if(searchNamePatterns.any { simple.contains(it.toLowerCase()) }) {
+								patternMatches.add(name)
+								if(!foundIn.containsKey(name)) foundIn[name] = f
+							}
 						}
 					}
 				} finally {
@@ -258,14 +249,9 @@ tasks.register("diagPort263") {
 		}
 
 		println "DIAG2_BEGIN"
-		println "DIAG2:BLAZE3D_REMAINING_COUNT=${blaze3dClasses.size()}"
-		blaze3dClasses.each { println "DIAG2:BLAZE3D_CLASS:${it}" }
-		foundByName.each { simple, paths ->
-			paths.each { p -> println "DIAG2:FOUND_BY_NAME:${simple}::${p}" }
-		}
-		searchNames.each { simple ->
-			if(!foundByName.containsKey(simple)) println "DIAG2:NOT_FOUND_BY_NAME:${simple}"
-		}
+		println "DIAG2:SDL_CLASS_COUNT=${sdlClasses.size()}"
+		sdlClasses.each { println "DIAG2:SDL_CLASS:${it}" }
+		patternMatches.each { println "DIAG2:PATTERN_MATCH:${it}" }
 
 		foundIn.each { name, jarFile ->
 			try {

@@ -7,7 +7,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import com.mojang.blaze3d.opengl.GlBackend;
+import com.mojang.renderpearl.backend.opengl.GlBackend;
 
 import dev.evvie.waylandcraft.gpu.EglAvailability;
 

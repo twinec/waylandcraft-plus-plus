@@ -6,7 +6,7 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.mojang.blaze3d.vulkan.VulkanGpuTextureView;
+import com.mojang.renderpearl.backend.vulkan.VulkanGpuTextureView;
 
 import dev.evvie.waylandcraft.vulkan.VulkanHelper;
 

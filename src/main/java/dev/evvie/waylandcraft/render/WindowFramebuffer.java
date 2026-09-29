@@ -7,28 +7,28 @@ import java.util.Optional;
 import org.joml.Matrix4fc;
 import org.joml.Vector4f;
 
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.IndexType;
-import com.mojang.blaze3d.PrimitiveTopology;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.buffers.Std140SizeCalculator;
-import com.mojang.blaze3d.pipeline.BindGroupLayout;
-import com.mojang.blaze3d.pipeline.BlendFunction;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.TextureTarget;
-import com.mojang.blaze3d.shaders.UniformType;
-import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.pipeline.BindGroupLayout;
+import com.mojang.renderpearl.api.pipeline.BlendFunction;
+import com.mojang.renderpearl.api.pipeline.ColorTargetState;
+import com.mojang.renderpearl.api.pipeline.IndexType;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.UniformType;
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 
 import dev.evvie.waylandcraft.WaylandCraftCommon;
 import dev.evvie.waylandcraft.bridge.WLCSurface;
@@ -37,8 +37,9 @@ import dev.evvie.waylandcraft.bridge.WLCSurface.ViewportSource;
 import dev.evvie.waylandcraft.displays.FramebufferRenderable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BindGroupLayouts;
-import net.minecraft.client.renderer.DynamicUniformStorage;
-import net.minecraft.client.renderer.DynamicUniformStorage.DynamicUniform;
+import net.minecraft.client.renderer.DynamicGpuDataStorage;
+import net.minecraft.client.renderer.DynamicGpuDataStorage.DynamicGpuData;
+import net.minecraft.client.renderer.DynamicGpuDataStorageMapped;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
@@ -86,7 +87,7 @@ public class WindowFramebuffer implements FramebufferRenderable {
 		.build()
 	);
 	
-	private static DynamicUniformStorage<WindowInfoUniform> uniformStorage = null;
+	private static DynamicGpuDataStorage<WindowInfoUniform> uniformStorage = null;
 	private static boolean debugDamage = false;
 	
 	public final WLCSurface surfaceTree;
@@ -113,7 +114,7 @@ public class WindowFramebuffer implements FramebufferRenderable {
 	
 	private static void ensureUniformStorage() {
 		if(uniformStorage == null) {
-			uniformStorage = new DynamicUniformStorage<WindowInfoUniform>("window framebuffer", WindowInfoUniform.SIZE, 2);
+			uniformStorage = new DynamicGpuDataStorageMapped<WindowInfoUniform>("window framebuffer", WindowInfoUniform.SIZE, 2, GpuBuffer.USAGE_UNIFORM);
 		}
 	}
 	
@@ -189,8 +190,8 @@ public class WindowFramebuffer implements FramebufferRenderable {
 		}
 		
 		ensureUniformStorage();
-		GpuBufferSlice alphaUniforms = uniformStorage.writeUniform(new WindowInfoUniform(poseStack.last().pose(), true));
-		GpuBufferSlice opaqueUniforms = uniformStorage.writeUniform(new WindowInfoUniform(poseStack.last().pose(), false));
+		GpuBufferSlice alphaUniforms = uniformStorage.writeData(new WindowInfoUniform(poseStack.last().pose(), true));
+		GpuBufferSlice opaqueUniforms = uniformStorage.writeData(new WindowInfoUniform(poseStack.last().pose(), false));
 		
 		try {
 			try(RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "window framebuffer", tempTarget.getColorTextureView(), Optional.of(new Vector4f(0, 0, 0, 0)))) {
@@ -371,7 +372,7 @@ public class WindowFramebuffer implements FramebufferRenderable {
 		
 	}
 	
-	private static record WindowInfoUniform(Matrix4fc mat, boolean alpha) implements DynamicUniform {
+	private static record WindowInfoUniform(Matrix4fc mat, boolean alpha) implements DynamicGpuData {
 		
 		public static final int SIZE = new Std140SizeCalculator().putMat4f().putFloat().get();
 		
