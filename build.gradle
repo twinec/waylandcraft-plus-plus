@@ -189,6 +189,84 @@ tasks.modrinth.onlyIf {
 
 tasks.modrinth.dependsOn tasks.build
 
+// TEMPORARY: diagnostic task for the 26.3 port -- runtime mixin injection
+// failure (hotfixRenderFrame). Not meant to survive past the port.
+tasks.register("diagRenderFrame") {
+	doLast {
+		def outDir = project.layout.buildDirectory.dir("diagRenderFrame").get().asFile
+		outDir.mkdirs()
+		def cp = sourceSets.main.compileClasspath.files
+
+		def targets = [
+			"net.minecraft.util.profiling.ProfilerFiller": [null, false],
+			"net.minecraft.client.Minecraft": ["renderFrame", true],
+			"com.mojang.blaze3d.platform.Window": [null, false],
+		]
+
+		targets.each { entry ->
+			def className = entry.key
+			def methodFilter = entry.value[0]
+			def useDisasm = entry.value[1]
+			def simpleName = className.substring(className.lastIndexOf('.') + 1)
+			def tempDir = new File(outDir, simpleName)
+			tempDir.mkdirs()
+			def found = false
+			for(jarFile in cp) {
+				if(!jarFile.name.endsWith(".jar")) continue
+				try {
+					new java.util.zip.ZipFile(jarFile).withCloseable { zf ->
+						def entryName = className.replace('.', '/') + ".class"
+						def zentry = zf.getEntry(entryName)
+						if(zentry != null) {
+							def outFile = new File(tempDir, entryName)
+							outFile.parentFile.mkdirs()
+							outFile.bytes = zf.getInputStream(zentry).bytes
+							found = true
+						}
+					}
+				} catch(Exception e) {}
+			}
+			if(!found) {
+				println "DIAG5:NOTFOUND:${className}"
+				return
+			}
+			def args = ["-p"]
+			if(useDisasm) args.add("-c")
+			args.add("-classpath")
+			args.add(tempDir.absolutePath)
+			args.add(className)
+			def execResult = providers.exec {
+				commandLine("javap", *args)
+				ignoreExitValue = true
+			}
+			def output = execResult.standardOutput.asText.get()
+			def errOutput = execResult.standardError.asText.get()
+			println "DIAG5_BEGIN:${className}"
+			println "DIAG5:EXIT:${className}::${execResult.result.get().exitValue}"
+			if(!errOutput.isEmpty()) {
+				errOutput.readLines().each { line -> println "DIAG5:ERR:${className}::${line}" }
+			}
+			def lines = output.readLines()
+			if(methodFilter == null) {
+				lines.each { line -> println "DIAG5:${className}::${line}" }
+			}
+			else {
+				def idx = lines.findIndexOf { it.contains("${methodFilter}(") }
+				if(idx < 0) {
+					println "DIAG5:METHODNOTFOUND:${className}::${methodFilter}"
+				}
+				else {
+					def endIdx = Math.min(lines.size(), idx + 500)
+					for(int i = idx; i < endIdx; i++) {
+						println "DIAG5:${className}::${lines[i]}"
+					}
+				}
+			}
+			println "DIAG5_END:${className}"
+		}
+	}
+}
+
 // configure the maven publication
 publishing {
 	publications {
