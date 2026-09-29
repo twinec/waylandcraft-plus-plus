@@ -201,14 +201,10 @@ tasks.register("diagGpuBuffer") {
 
 		def targets = [
 			"com.mojang.renderpearl.api.buffers.GpuBuffer",
-			"net.minecraft.client.renderer.DynamicGpuDataStorageMapped",
-			"net.minecraft.client.renderer.MappableRingBuffer",
-			"net.minecraft.client.renderer.DynamicUniformStorage",
-			"com.mojang.renderpearl.frontend.FrontendGpuDevice",
-			"com.mojang.renderpearl.backend.vulkan.VulkanDevice",
-			"com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer\$Direct",
-			"com.mojang.renderpearl.backend.vulkan.init.FeatureSet",
-			"net.minecraft.client.renderer.DynamicTransforms",
+			"com.mojang.renderpearl.backend.vulkan.VulkanConst",
+			"com.mojang.renderpearl.backend.vulkan.init.VulkanFeature",
+			"com.mojang.renderpearl.backend.vulkan.VulkanBackend",
+			"com.mojang.renderpearl.backend.vulkan.VulkanPhysicalDevice",
 		]
 
 		targets.each { className ->
@@ -236,7 +232,7 @@ tasks.register("diagGpuBuffer") {
 				return
 			}
 			def execResult = providers.exec {
-				commandLine("javap", "-p", "-c", "-classpath", tempDir.absolutePath, className)
+				commandLine("javap", "-p", "-c", "-constants", "-classpath", tempDir.absolutePath, className)
 				ignoreExitValue = true
 			}
 			def output = execResult.standardOutput.asText.get()
