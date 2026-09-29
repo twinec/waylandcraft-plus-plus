@@ -190,59 +190,6 @@ tasks.modrinth.onlyIf {
 
 tasks.modrinth.dependsOn tasks.build
 
-// TEMPORARY: diagnostic task for the 26.3 port -- runtime mixin injection
-// failure (GlBackendMixin.changeContextApi). Not meant to survive past the port.
-tasks.register("diagGlBackend") {
-	doLast {
-		def outDir = project.layout.buildDirectory.dir("diagGlBackend").get().asFile
-		outDir.mkdirs()
-		def cp = sourceSets.main.compileClasspath.files
-
-		def targets = [
-			"com.mojang.renderpearl.backend.opengl.GlBackend",
-		]
-
-		targets.each { className ->
-			def simpleName = className.substring(className.lastIndexOf('.') + 1)
-			def tempDir = new File(outDir, simpleName)
-			tempDir.mkdirs()
-			def found = false
-			for(jarFile in cp) {
-				if(!jarFile.name.endsWith(".jar")) continue
-				try {
-					new java.util.zip.ZipFile(jarFile).withCloseable { zf ->
-						def entryName = className.replace('.', '/') + ".class"
-						def zentry = zf.getEntry(entryName)
-						if(zentry != null) {
-							def outFile = new File(tempDir, entryName)
-							outFile.parentFile.mkdirs()
-							outFile.bytes = zf.getInputStream(zentry).bytes
-							found = true
-						}
-					}
-				} catch(Exception e) {}
-			}
-			if(!found) {
-				println "DIAG6:NOTFOUND:${className}"
-				return
-			}
-			def execResult = providers.exec {
-				commandLine("javap", "-p", "-classpath", tempDir.absolutePath, className)
-				ignoreExitValue = true
-			}
-			def output = execResult.standardOutput.asText.get()
-			def errOutput = execResult.standardError.asText.get()
-			println "DIAG6_BEGIN:${className}"
-			println "DIAG6:EXIT:${className}::${execResult.result.get().exitValue}"
-			if(!errOutput.isEmpty()) {
-				errOutput.readLines().each { line -> println "DIAG6:ERR:${className}::${line}" }
-			}
-			output.readLines().each { line -> println "DIAG6:${className}::${line}" }
-			println "DIAG6_END:${className}"
-		}
-	}
-}
-
 // configure the maven publication
 publishing {
 	publications {
