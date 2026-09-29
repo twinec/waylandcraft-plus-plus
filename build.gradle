@@ -237,7 +237,8 @@ tasks.register("diagPort263c") {
 						def entryName = className.replace('.', '/') + ".class"
 						def entry = zf.getEntry(entryName)
 						if(entry != null) {
-							def outFile = new File(tempDir, "${simpleName}.class")
+							def outFile = new File(tempDir, entryName)
+							outFile.parentFile.mkdirs()
 							outFile.bytes = zf.getInputStream(entry).bytes
 							found = true
 						}
