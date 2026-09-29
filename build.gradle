@@ -253,7 +253,12 @@ tasks.register("diagPort263c") {
 				ignoreExitValue = true
 			}
 			def output = execResult.standardOutput.asText.get()
+			def errOutput = execResult.standardError.asText.get()
 			println "DIAG4_JAVAP_BEGIN:${className}"
+			println "DIAG4:EXIT:${className}::${execResult.result.get().exitValue}"
+			if(!errOutput.isEmpty()) {
+				errOutput.readLines().each { line -> println "DIAG4:JAVAPERR:${className}::${line}" }
+			}
 			output.readLines().each { line ->
 				if(filterKeywords == null || filterKeywords.any { kw -> line.contains(kw) }) {
 					println "DIAG4:JAVAP:${className}::${line}"
