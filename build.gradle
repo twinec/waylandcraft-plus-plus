@@ -231,7 +231,7 @@ tasks.register("diagBindGroup") {
 					targets.keySet().each { entryName ->
 						def entry = zf.getEntry(entryName)
 						if (entry != null && seen.add(entryName)) {
-							def outFile = new File(workDir, entryName.replace('/', '_'))
+							def outFile = new File(workDir, entryName)
 							outFile.parentFile.mkdirs()
 							outFile.bytes = zf.getInputStream(entry).getBytes()
 						}
@@ -245,7 +245,7 @@ tasks.register("diagBindGroup") {
 		}
 		targets.each { entryName, flags ->
 			def className = entryName.replace('.class', '').replace('/', '.')
-			def outFile = new File(workDir, entryName.replace('/', '_'))
+			def outFile = new File(workDir, entryName)
 			if (!outFile.exists()) {
 				println "DIAGBIND:NOTFOUND:${entryName}"
 				return
