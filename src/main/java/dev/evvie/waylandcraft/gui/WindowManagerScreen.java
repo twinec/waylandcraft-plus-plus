@@ -277,7 +277,7 @@ public class WindowManagerScreen extends Screen {
 
 		MouseHandler mouseHandler = Minecraft.getInstance().mouseHandler;
 		mouseHandler.setIgnoreFirstMove(); // don't accumulate any movement in accumulatedDX,DY
-		((IMouseHandlerMixin) mouseHandler).invokeOnMove(window, mouseX, mouseY);
+		((IMouseHandlerMixin) mouseHandler).invokeOnMove(window, mouseX, mouseY, 0.0, 0.0);
 		/* </HACK> */
 		
 		resizeMode = false;
