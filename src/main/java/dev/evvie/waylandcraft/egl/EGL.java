@@ -6,15 +6,14 @@ import java.nio.LongBuffer;
 import java.nio.charset.StandardCharsets;
 
 import org.lwjgl.PointerBuffer;
-import org.lwjgl.glfw.GLFW;
-import org.lwjgl.glfw.GLFWNativeEGL;
+import org.lwjgl.sdl.SDLVideo;
 import org.lwjgl.system.JNI;
 import org.lwjgl.system.MemoryUtil;
 
 public class EGL {
-	
+
 	private static long getProcAddress(String name) {
-		return GLFW.glfwGetProcAddress(name);
+		return SDLVideo.SDL_EGL_GetProcAddress(name);
 	}
 	
 	// Random (non-) EGL constants
@@ -107,7 +106,7 @@ public class EGL {
 	}
 	
 	public static long getEGLDisplay() {
-		return GLFWNativeEGL.glfwGetEGLDisplay();
+		return SDLVideo.SDL_EGL_GetCurrentDisplay();
 	}
 	
 	public static int eglGetError() {

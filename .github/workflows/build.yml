@@ -62,9 +62,7 @@ jobs:
     - name: Setup gradle
       uses: gradle/actions/setup-gradle@v6
     - name: Build java code
-      # TEMPORARY: pointed at the 26.3-port diagnostic task instead of `build`.
-      # Revert to `./gradlew build` once the port lands.
-      run: ./gradlew diagPort263 --console=plain
+      run: ./gradlew build
     - name: Upload artifact
       uses: actions/upload-artifact@v7
       with:

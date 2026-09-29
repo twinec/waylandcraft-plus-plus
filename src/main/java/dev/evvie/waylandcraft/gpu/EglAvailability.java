@@ -1,6 +1,8 @@
 package dev.evvie.waylandcraft.gpu;
 
-import org.lwjgl.glfw.GLFW;
+import org.lwjgl.sdl.SDLHints;
+import org.lwjgl.sdl.SDLInit;
+import org.lwjgl.sdl.SDLVideo;
 
 import dev.evvie.waylandcraft.WaylandCraftCommon;
 
@@ -28,18 +30,16 @@ public final class EglAvailability {
 	}
 
 	private static boolean runProbe() {
-		if(!GLFW.glfwInit()) return false;
+		if(!SDLInit.SDL_Init(SDLInit.SDL_INIT_VIDEO)) return false;
 
-		GLFW.glfwDefaultWindowHints();
-		GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
-		GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_CREATION_API, GLFW.GLFW_EGL_CONTEXT_API);
+		SDLHints.SDL_SetHint(SDLHints.SDL_HINT_VIDEO_FORCE_EGL, "1");
 
-		long handle = GLFW.glfwCreateWindow(1, 1, "waylandcraft-egl-probe", 0L, 0L);
-		GLFW.glfwDefaultWindowHints();
+		long handle = SDLVideo.SDL_CreateWindow("waylandcraft-egl-probe", 1, 1, SDLVideo.SDL_WINDOW_OPENGL | SDLVideo.SDL_WINDOW_HIDDEN);
+		SDLHints.SDL_SetHint(SDLHints.SDL_HINT_VIDEO_FORCE_EGL, "0");
 
 		if(handle == 0L) return false;
 
-		GLFW.glfwDestroyWindow(handle);
+		SDLVideo.SDL_DestroyWindow(handle);
 		return true;
 	}
 

@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
+import org.lwjgl.sdl.SDLVideo;
 import org.lwjgl.system.Platform;
 
 import com.mojang.blaze3d.platform.InputConstants;
@@ -730,7 +730,7 @@ public class WaylandCraft implements ClientModInitializer {
 	
 	/* Handle keyboard input
 	 * Returns true when the key press action has been consumed
-	 * This code just completely naively assumes that the scancode received by GLFW
+	 * This code just completely naively assumes that the scancode received from SDL
 	 * is also the correct matching Wayland scancode for the default XKBConfig.
 	 * For X11 and Wayland hosts, this is a huge hack but should mostly work for now
 	 */
@@ -767,7 +767,7 @@ public class WaylandCraft implements ClientModInitializer {
 	}
 	
 	public static int correctScancode(int scancode) {
-		if(GLFW.glfwGetPlatform() == GLFW.GLFW_PLATFORM_WAYLAND) {
+		if("wayland".equals(SDLVideo.SDL_GetCurrentVideoDriver())) {
 			scancode += 8;
 		}
 		return scancode;
