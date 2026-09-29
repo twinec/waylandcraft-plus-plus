@@ -43,6 +43,7 @@ public class RenderUtils {
 			.withVertexShader(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "core/rendertype_window"))
 			.withFragmentShader(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "core/rendertype_window"))
 			.withBindGroupLayout(BindGroupLayouts.PROJECTION)
+			.withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
 			.withBindGroupLayout(BindGroupLayouts.SAMPLER0)
 			.withDepthStencilState(DepthStencilState.DEFAULT)
 			.withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
