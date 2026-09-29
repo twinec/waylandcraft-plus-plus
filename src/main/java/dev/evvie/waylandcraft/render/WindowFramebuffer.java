@@ -178,18 +178,24 @@ public class WindowFramebuffer implements FramebufferRenderable {
 			}
 		}
 		if(target == null || tempTarget == null) return;
-		
+
+		try {
+			ensureUniformStorage();
+		} catch(RuntimeException e) {
+			WaylandCraftCommon.LOGGER.warn("Failed to allocate window framebuffer uniform storage, skipping this frame", e);
+			return;
+		}
+
 		PoseStack poseStack = new PoseStack();
 		poseStack.translate(-1.0, -1.0, 0.0);
 		poseStack.scale(2.0f / width, 2.0f / height, 1.0f);
-		
+
 		ArrayList<CompiledBufferDraw> elements = new ArrayList<>();
 		for(WLCSurface surface = surfaceTree; surface != null; surface = surface.getNextChild()) {
 			BufferDraw draw = bakeSurface(surface, xoff + surface.xSubpos, yoff + surface.ySubpos);
 			if(draw != null) elements.add(draw.compile());
 		}
-		
-		ensureUniformStorage();
+
 		GpuBufferSlice alphaUniforms = uniformStorage.writeData(new WindowInfoUniform(poseStack.last().pose(), true));
 		GpuBufferSlice opaqueUniforms = uniformStorage.writeData(new WindowInfoUniform(poseStack.last().pose(), false));
 		
