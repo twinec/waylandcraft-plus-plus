@@ -313,7 +313,7 @@ public class SharingOwner {
 		var device = RenderSystem.getDevice();
 		var commands = device.createCommandEncoder();
 		try(RenderPass pass = commands.createRenderPass(() -> "window share capture", target.getColorTextureView(), Optional.of(new Vector4f(0, 0, 0, 1)))) {
-			pass.setPipeline(CAPTURE_PIPELINE);
+			pass.setPipeline(RenderSystem.getCompiledPipeline(CAPTURE_PIPELINE));
 			RenderSystem.bindDefaultUniforms(pass);
 			pass.setUniform("InSampler", framebuffer.getTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
 			pass.draw(3, 1, 0, 0);

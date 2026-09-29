@@ -281,7 +281,7 @@ public abstract class BufferTexture {
 			if(internalTexture == null) return;
 			
 			try(RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Dmabuf blit", target.getColorTextureView(), Optional.of(new Vector4f(0, 0, 0, 0)))) {
-				renderPass.setPipeline(DMABUF_BLIT);
+				renderPass.setPipeline(RenderSystem.getCompiledPipeline(DMABUF_BLIT));
 				RenderSystem.bindDefaultUniforms(renderPass);
 				renderPass.setUniform("InSampler", internalView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
 				renderPass.draw(3, 1, 0, 0);

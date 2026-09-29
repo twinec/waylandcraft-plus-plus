@@ -342,7 +342,7 @@ public class SettingsWidget extends AbstractWidget {
 				return true;
 			}
 			
-			int digit = event.getDigit();
+			int digit = (event.key() >= InputConstants.KEY_0 && event.key() <= InputConstants.KEY_9) ? event.key() - InputConstants.KEY_0 : -1;
 			if(digit != -1) {
 				if(entry != null) entry += digit;
 				else entry = "" + digit;
