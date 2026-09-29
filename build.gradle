@@ -201,10 +201,10 @@ tasks.register("diagPort263c") {
 			try {
 				new java.util.zip.ZipFile(jarFile).withCloseable { zf ->
 					zf.entries().each { entry ->
-						if(entry.name.contains("net/minecraft/client/renderer/") && entry.name.contains("Item") && !entry.name.contains("$")) {
+						if(entry.name.contains("net/minecraft/client/renderer/") && entry.name.contains("Item") && !entry.name.contains('$')) {
 							println "DIAG4:MCITEM:${jarFile.name}:${entry.name}"
 						}
-						if(entry.name.contains("net/minecraft/client/renderer/entity/") && entry.name.contains("Hand") && !entry.name.contains("$")) {
+						if(entry.name.contains("net/minecraft/client/renderer/entity/") && entry.name.contains("Hand") && !entry.name.contains('$')) {
 							println "DIAG4:MCENTITYRENDERER:${jarFile.name}:${entry.name}"
 						}
 					}
