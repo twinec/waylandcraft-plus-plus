@@ -200,7 +200,9 @@ tasks.register("diagVulkanBackend") {
 		def cp = sourceSets.main.compileClasspath.files
 
 		def targets = [
-			"com.mojang.renderpearl.backend.vulkan.VulkanBackend",
+			"com.mojang.renderpearl.backend.vulkan.init.FeatureSet",
+			"com.mojang.renderpearl.backend.vulkan.VulkanPhysicalDevice",
+			"com.mojang.renderpearl.backend.vulkan.VulkanInstance",
 		]
 
 		targets.each { className ->
