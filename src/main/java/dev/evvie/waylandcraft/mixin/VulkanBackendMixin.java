@@ -22,7 +22,7 @@ public class VulkanBackendMixin {
 			at = @At("HEAD"),
 			argsOnly = true
 	)
-	private static FeatureSet checkMoreVulkanExtensions(FeatureSet featureSet, VulkanPhysicalDevice physicalDevice) {
+	private static FeatureSet checkMoreVulkanExtensions(FeatureSet featureSet, FeatureSet originalFeatureSet, VulkanPhysicalDevice physicalDevice) {
 		boolean hasNecessaryExtensions = true;
 		for(String extension : VulkanHelper.NECESSARY_VULKAN_EXTENSIONS) {
 			if(!physicalDevice.hasDeviceExtension(extension)) {
