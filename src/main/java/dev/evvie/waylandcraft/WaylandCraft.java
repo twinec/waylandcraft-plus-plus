@@ -141,10 +141,10 @@ public class WaylandCraft implements ClientModInitializer {
 		ClientConfigurationNetworking.registerGlobalReceiver(ClientboundHelloPayload.TYPE, (payload, ctx) -> {});
 		ClientPlayNetworking.registerGlobalReceiver(ClientboundHelloPayload.TYPE, (payload, ctx) -> {});
 
-		keyOpenScreen = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.windowManager", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_B, KEYBIND_CATEGORY));
-		keyOpenAppLauncher = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.appLauncher", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_V, KEYBIND_CATEGORY));
-		keyCaptureKeyboard = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.captureKeyboard", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G, KEYBIND_CATEGORY));
-		keyToggleSharing = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.toggleSharing", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_N, KEYBIND_CATEGORY));
+		keyOpenScreen = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.windowManager", InputConstants.Type.KEYBOARD, InputConstants.KEY_B, KEYBIND_CATEGORY));
+		keyOpenAppLauncher = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.appLauncher", InputConstants.Type.KEYBOARD, InputConstants.KEY_V, KEYBIND_CATEGORY));
+		keyCaptureKeyboard = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.captureKeyboard", InputConstants.Type.KEYBOARD, InputConstants.KEY_G, KEYBIND_CATEGORY));
+		keyToggleSharing = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.toggleSharing", InputConstants.Type.KEYBOARD, InputConstants.KEY_N, KEYBIND_CATEGORY));
 		
 		WindowItemModel.register();
 		
@@ -737,7 +737,7 @@ public class WaylandCraft implements ClientModInitializer {
 	public boolean onKeyPress(long windowHandle, int key, int scancode, int action, int modifiers) {
 		if(bridge == null) return false;
 		
-		if(key == GLFW.GLFW_KEY_Q && modifiers == GLFW.GLFW_MOD_ALT) {
+		if(key == InputConstants.KEY_Q && modifiers == InputConstants.MOD_ALT) {
 			if(action == 0) return true;
 			
 			if(keyboardCaptureMode != KeyboardCaptureMode.HARD_CAPTURE) {
@@ -751,15 +751,15 @@ public class WaylandCraft implements ClientModInitializer {
 		
 		if(keyboardCaptureMode == KeyboardCaptureMode.NONE) return false;
 		
-		if(keyboardCaptureMode == KeyboardCaptureMode.CAPTURE && key == GLFW.GLFW_KEY_ESCAPE) {
+		if(keyboardCaptureMode == KeyboardCaptureMode.CAPTURE && key == InputConstants.KEY_ESCAPE) {
 			disableKeyboardCapture();
 			return true;
 		}
-		
-		if(action == GLFW.GLFW_PRESS) {
+
+		if(action == InputConstants.PRESS) {
 			bridge.pressKey(scancode);
 		}
-		else if(action == GLFW.GLFW_RELEASE) {
+		else if(action == InputConstants.RELEASE) {
 			bridge.releaseKey(scancode);
 		}
 		

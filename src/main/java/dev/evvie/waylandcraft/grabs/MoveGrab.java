@@ -1,7 +1,5 @@
 package dev.evvie.waylandcraft.grabs;
 
-import org.lwjgl.glfw.GLFW;
-
 import com.mojang.blaze3d.platform.InputConstants;
 
 import dev.evvie.waylandcraft.displays.WindowDisplay;
@@ -9,7 +7,6 @@ import dev.evvie.waylandcraft.grabs.PointerGrabMap.ImplicitGrab;
 import dev.evvie.waylandcraft.math.WorldPlane;
 import dev.evvie.waylandcraft.math.WorldPlane.Intersection;
 import dev.evvie.waylandcraft.utils.CursorShape;
-import net.minecraft.client.Minecraft;
 import net.minecraft.world.phys.Vec3;
 
 public class MoveGrab extends PointerGrab {
@@ -50,7 +47,7 @@ public class MoveGrab extends PointerGrab {
 		Vec3 worldDiff = initialWorld.subtract(intersect.world());
 		
 		Vec3 diff = intersect.local().subtract(initialLocal);
-		snapActive = InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL);
+		snapActive = InputConstants.isKeyDown(InputConstants.KEY_LCONTROL);
 		if(snapActive) {
 			double minDist = 0.25;
 			if(max3(Math.abs(worldDiff.x), Math.abs(worldDiff.y), Math.abs(worldDiff.z)) < minDist) {

@@ -1,10 +1,11 @@
 package dev.evvie.waylandcraft.mixin;
 
-import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+import com.mojang.blaze3d.platform.InputConstants;
 
 import dev.evvie.waylandcraft.WaylandCraft;
 import net.minecraft.client.KeyboardHandler;
@@ -29,9 +30,9 @@ public class KeyboardHandlerMixin {
 		if(WaylandCraft.instance.bridge == null) return;
 		
 		int scancode = WaylandCraft.correctScancode(event.scancode());
-		if(action != GLFW.GLFW_PRESS && action != GLFW.GLFW_RELEASE) return;
-		
-		WaylandCraft.instance.bridge.internalKeyUpdate(scancode, action == GLFW.GLFW_PRESS);
+		if(action != InputConstants.PRESS && action != InputConstants.RELEASE) return;
+
+		WaylandCraft.instance.bridge.internalKeyUpdate(scancode, action == InputConstants.PRESS);
 	}
 	
 }
