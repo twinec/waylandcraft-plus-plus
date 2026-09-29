@@ -42,7 +42,7 @@ public class RenderUtils {
 	private static final RenderPipeline.Snippet WINDOW_PIPELINE_SNIPPET = RenderPipeline.builder(RenderPipelines.GLOBALS_SNIPPET)
 			.withVertexShader(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "core/rendertype_window"))
 			.withFragmentShader(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "core/rendertype_window"))
-			.withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+			.withBindGroupLayout(BindGroupLayouts.PROJECTION)
 			.withBindGroupLayout(BindGroupLayouts.SAMPLER0)
 			.withDepthStencilState(DepthStencilState.DEFAULT)
 			.withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)

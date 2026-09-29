@@ -155,11 +155,11 @@ public class WindowFramebuffer implements FramebufferRenderable {
 		}
 		
 		if(tempTarget == null) {
-			tempTarget = new TextureTarget(name() + "-temp", width, height, false, GpuFormat.RGBA8_UNORM);
+			tempTarget = new TextureTarget(name() + "-temp", width, height, GpuFormat.RGBA8_UNORM, null);
 		}
-		
+
 		if(target == null) {
-			target = new TextureTarget(name(), width, height, false, GpuFormat.RGBA8_UNORM);
+			target = new TextureTarget(name(), width, height, GpuFormat.RGBA8_UNORM, null);
 		}
 		
 		if(texture == null) registerTexture();
@@ -198,7 +198,7 @@ public class WindowFramebuffer implements FramebufferRenderable {
 				pass.setPipeline(WINDOW_PIPELINE);
 				for(CompiledBufferDraw element : elements) {
 					pass.setUniform("WindowInfo", element.alpha ? alphaUniforms : opaqueUniforms);
-					pass.bindTexture("Sampler0", element.textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+					pass.setUniform("Sampler0", element.textureView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
 					pass.setVertexBuffer(0, element.vertexBuffer.slice());
 					pass.setIndexBuffer(element.indexBuffer, element.indexType);
 					pass.drawIndexed(element.indexCount, 1, 0, 0, 0);
@@ -215,7 +215,7 @@ public class WindowFramebuffer implements FramebufferRenderable {
 		
 		try(RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "window framebuffer unpremultiply", target.getColorTextureView(), Optional.empty())) {
 			pass.setPipeline(UNPREMULTIPLY_PIPELINE);
-			pass.bindTexture("Sampler0", tempTarget.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+			pass.setUniform("Sampler0", tempTarget.getColorTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
 			pass.draw(3, 1, 0, 0);
 		}
 	}

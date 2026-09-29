@@ -306,7 +306,7 @@ public class SharingOwner {
 		if(window.captureTarget == null || window.captureTarget.width != width || window.captureTarget.height != height) {
 			// Safe to replace: captures for this window wait until its previous readback finished
 			if(window.captureTarget != null) window.captureTarget.destroyBuffers();
-			window.captureTarget = new TextureTarget("waylandcraft window share capture", width, height, false, GpuFormat.RGBA8_UNORM);
+			window.captureTarget = new TextureTarget("waylandcraft window share capture", width, height, GpuFormat.RGBA8_UNORM, null);
 		}
 		TextureTarget target = window.captureTarget;
 
@@ -315,7 +315,7 @@ public class SharingOwner {
 		try(RenderPass pass = commands.createRenderPass(() -> "window share capture", target.getColorTextureView(), Optional.of(new Vector4f(0, 0, 0, 1)))) {
 			pass.setPipeline(CAPTURE_PIPELINE);
 			RenderSystem.bindDefaultUniforms(pass);
-			pass.bindTexture("InSampler", framebuffer.getTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+			pass.setUniform("InSampler", framebuffer.getTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
 			pass.draw(3, 1, 0, 0);
 		}
 		long timestamp = System.currentTimeMillis();

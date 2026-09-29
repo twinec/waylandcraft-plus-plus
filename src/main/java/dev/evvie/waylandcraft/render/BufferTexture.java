@@ -265,7 +265,7 @@ public abstract class BufferTexture {
 			super(buf.width(), buf.height(), BufferTexture.FORMAT_ARGB8888);
 			this.handle = buf.handle();
 			
-			target = new TextureTarget("dmabuf-target-" + this.hashCode(), width, height, false, GpuFormat.RGBA8_UNORM);
+			target = new TextureTarget("dmabuf-target-" + this.hashCode(), width, height, GpuFormat.RGBA8_UNORM, null);
 		}
 		
 		// Destroys internal data
@@ -283,7 +283,7 @@ public abstract class BufferTexture {
 			try(RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Dmabuf blit", target.getColorTextureView(), Optional.of(new Vector4f(0, 0, 0, 0)))) {
 				renderPass.setPipeline(DMABUF_BLIT);
 				RenderSystem.bindDefaultUniforms(renderPass);
-				renderPass.bindTexture("InSampler", internalView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+				renderPass.setUniform("InSampler", internalView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
 				renderPass.draw(3, 1, 0, 0);
 			}
 		}

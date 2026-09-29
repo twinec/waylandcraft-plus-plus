@@ -214,15 +214,15 @@ tasks.register("diagPort263c") {
 		println "DIAG4_SEARCH_END"
 
 		def targets = [
-			"net.minecraft.client.input.KeyEvent": null,
-			"com.mojang.blaze3d.pipeline.TextureTarget": null,
-			"com.mojang.renderpearl.api.pipeline.RenderPipeline": ["Compiled", "class ", "interface "],
-			"com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline": null,
-			"net.minecraft.client.renderer.RenderPipelines": ["register"],
-			"com.mojang.renderpearl.api.commands.RenderPass": ["bindTexture", "setPipeline", "Sampler", "Texture"],
-			"net.minecraft.client.renderer.BindGroupLayouts": ["MATRICES", "PROJECTION", "Projection"],
-			"net.minecraft.client.renderer.entity.EntityRenderDispatcher": ["ItemInHand", "itemInHand", "Item"],
-			"net.minecraft.client.renderer.GameRenderer": ["ItemInHand", "itemInHand"],
+			"com.mojang.renderpearl.api.pipeline.RenderPipeline": null,
+			"com.mojang.renderpearl.api.commands.RenderPass": null,
+			"com.mojang.blaze3d.systems.RenderSystem": ["Pipeline", "compile", "Compile", "ompiled"],
+			"com.mojang.renderpearl.api.device.GpuDevice": ["Pipeline", "compile", "Compile", "ompiled"],
+			"net.minecraft.client.renderer.RenderPipelines": null,
+			"net.minecraft.client.input.InputConstants": ["KEY_0", "KEY_1", "KEY_2", "KEY_3", "KEY_4", "KEY_5", "KEY_6", "KEY_7", "KEY_8", "KEY_9", "KP_"],
+			"net.minecraft.client.renderer.FirstPersonHandsAndItemsRenderer": null,
+			"net.minecraft.client.renderer.entity.layers.ItemInHandLayer": null,
+			"net.minecraft.client.renderer.entity.layers.PlayerItemInHandLayer": null,
 		]
 
 		targets.each { className, filterKeywords ->
