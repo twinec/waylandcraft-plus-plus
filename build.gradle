@@ -208,7 +208,7 @@ tasks.register("diagPort263") {
 			"com/mojang/blaze3d/platform/InputConstants\$Type.class",
 		] as Set
 
-		def searchNamePatterns = ["key", "scancode", "keycode", "event", "hint", "window", "video", "init", "sdl.class"]
+		def searchNamePatterns = [] // round 4a: class listing only, no javap flood
 
 		def tmpDir = new File(project.layout.buildDirectory.get().asFile, "diag-extract2")
 		tmpDir.deleteDir()
@@ -231,13 +231,6 @@ tasks.register("diagPort263") {
 						}
 						if(knownCandidates.contains(name) && !foundIn.containsKey(name)) {
 							foundIn[name] = f
-						}
-						if(name.startsWith("org/lwjgl/sdl/")) {
-							def simple = name.substring(name.lastIndexOf('/') + 1).toLowerCase()
-							if(searchNamePatterns.any { simple.contains(it.toLowerCase()) }) {
-								patternMatches.add(name)
-								if(!foundIn.containsKey(name)) foundIn[name] = f
-							}
 						}
 					}
 				} finally {
