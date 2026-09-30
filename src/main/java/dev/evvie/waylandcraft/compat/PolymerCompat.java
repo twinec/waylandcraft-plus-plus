@@ -4,6 +4,8 @@ import eu.pb4.polymer.common.api.PolymerCommonUtils;
 import eu.pb4.polymer.core.api.item.PolymerItem;
 import eu.pb4.polymer.core.api.utils.PolymerClientDecoded;
 import eu.pb4.polymer.core.api.utils.PolymerSyncedObject;
+import net.fabricmc.fabric.api.event.registry.RegistryAttribute;
+import net.fabricmc.fabric.api.event.registry.RegistryAttributeHolder;
 import net.fabricmc.fabric.api.networking.v1.context.PacketContext;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.HolderLookup;
@@ -43,6 +45,21 @@ public class PolymerCompat {
 	private static final Identifier FALLBACK_MODEL = Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "window_icon");
 
 	public static void register() {
+		// fabric-registry-sync-v0 normally disconnects any client that's
+		// missing a registry entry the server has -- that's how it detects
+		// a player who's missing a required content mod. Since WINDOW's
+		// disguise below (setPlainSyncedObject) only changes what's sent
+		// *after* a client is let in, not whether registry-sync considers
+		// the entry required, a vanilla/non-WaylandCraft client would still
+		// get kicked as "missing" the mod during the CONFIGURATION-phase
+		// registry handshake, before Polymer ever gets a chance to disguise
+		// anything for them. Marking the ITEM registry OPTIONAL tells
+		// registry-sync not to require a full match on it, which is the
+		// standard pairing with Polymer-based item disguising (this is also
+		// how Server Backpacks, our reference implementation, avoids the
+		// same kick).
+		RegistryAttributeHolder.get(BuiltInRegistries.ITEM).addAttribute(RegistryAttribute.OPTIONAL);
+
 		// Makes our own textures/models (including FALLBACK_MODEL above)
 		// available in Polymer's generated resource pack, so non-modded
 		// clients actually have something to render for the fallback model
