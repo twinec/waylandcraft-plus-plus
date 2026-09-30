@@ -139,15 +139,35 @@ jar {
 tasks.register("diagRegistrySync2") {
 	doLast {
 		def classNames = [
-			"net.fabricmc.fabric.impl.registry.sync.RegistrySyncManager\$SyncConfigurationTask",
-			"net.fabricmc.fabric.impl.registry.sync.trackers.IdMapperTracker",
-			"net.fabricmc.fabric.impl.registry.sync.RemappableRegistry"
+			"net.fabricmc.fabric.impl.registry.sync.FabricRegistryInit",
+			"net.fabricmc.fabric.impl.registry.sync.packet.RegistrySyncPayload",
+			"net.fabricmc.fabric.impl.registry.sync.SyncCompletePayload"
+		]
+		def listPrefixes = [
+			"net/fabricmc/fabric/impl/registry/"
 		]
 		def workDir = file("${buildDir}/diagRegistrySync2")
 		workDir.deleteDir()
 		workDir.mkdirs()
 
 		def classpathFiles = sourceSets.main.compileClasspath.files + sourceSets.main.runtimeClasspath.files
+
+		for(def prefix in listPrefixes) {
+			println "DIAGRS2_LIST_BEGIN:${prefix}"
+			for(def f in classpathFiles) {
+				if(!f.exists() || !f.name.endsWith(".jar")) continue
+				try {
+					def zip = new java.util.zip.ZipFile(f)
+					zip.entries().each { entry ->
+						if(entry.name.startsWith(prefix) && entry.name.endsWith(".class") && !entry.name.contains('$')) {
+							println "  ${f.name}: ${entry.name}"
+						}
+					}
+					zip.close()
+				} catch(Exception e) { }
+			}
+			println "DIAGRS2_LIST_END:${prefix}"
+		}
 
 		for(def className in classNames) {
 			def entryName = className.replace('.', '/') + ".class"
