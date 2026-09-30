@@ -1,6 +1,7 @@
 package dev.evvie.waylandcraft;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -8,7 +9,6 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.sdl.SDLVideo;
 import org.lwjgl.system.Platform;
 
 import com.mojang.blaze3d.platform.InputConstants;
@@ -730,9 +730,6 @@ public class WaylandCraft implements ClientModInitializer {
 	
 	/* Handle keyboard input
 	 * Returns true when the key press action has been consumed
-	 * This code just completely naively assumes that the scancode received from SDL
-	 * is also the correct matching Wayland scancode for the default XKBConfig.
-	 * For X11 and Wayland hosts, this is a huge hack but should mostly work for now
 	 */
 	public boolean onKeyPress(long windowHandle, int key, int scancode, int action, int modifiers) {
 		if(bridge == null) return false;
@@ -766,11 +763,210 @@ public class WaylandCraft implements ClientModInitializer {
 		return true;
 	}
 	
+	/* SDL's scancodes are USB-HID-based (SDL_SCANCODE_A = 4), a completely
+	 * different numbering scheme from the Linux evdev keycodes (KEY_A = 30)
+	 * that our embedded Wayland compositor's native side works in (both for
+	 * emitting wl_keyboard.key events and for driving libxkbcommon, which
+	 * expects an "XKB keycode" = evdev keycode + 8). This table is the
+	 * inverse of SDL's own linux_scancode_table (src/events/scancodes_linux.h),
+	 * covering every SDL scancode that table maps to; anything not covered
+	 * falls back to the raw scancode, which is wrong but at least won't
+	 * underflow when the native side subtracts 8 back off.
+	 */
+	private static final int[] SDL_SCANCODE_TO_EVDEV = buildScancodeToEvdevTable();
+
+	private static int[] buildScancodeToEvdevTable() {
+		int[] table = new int[287];
+		Arrays.fill(table, -1);
+
+		table[4] = 30; // A
+		table[5] = 48; // B
+		table[6] = 46; // C
+		table[7] = 32; // D
+		table[8] = 18; // E
+		table[9] = 33; // F
+		table[10] = 34; // G
+		table[11] = 35; // H
+		table[12] = 23; // I
+		table[13] = 36; // J
+		table[14] = 37; // K
+		table[15] = 38; // L
+		table[16] = 50; // M
+		table[17] = 49; // N
+		table[18] = 24; // O
+		table[19] = 25; // P
+		table[20] = 16; // Q
+		table[21] = 19; // R
+		table[22] = 31; // S
+		table[23] = 20; // T
+		table[24] = 22; // U
+		table[25] = 47; // V
+		table[26] = 17; // W
+		table[27] = 45; // X
+		table[28] = 21; // Y
+		table[29] = 44; // Z
+		table[30] = 2; // 1
+		table[31] = 3; // 2
+		table[32] = 4; // 3
+		table[33] = 5; // 4
+		table[34] = 6; // 5
+		table[35] = 7; // 6
+		table[36] = 8; // 7
+		table[37] = 9; // 8
+		table[38] = 10; // 9
+		table[39] = 11; // 0
+		table[40] = 28; // RETURN
+		table[41] = 1; // ESCAPE
+		table[42] = 14; // BACKSPACE
+		table[43] = 15; // TAB
+		table[44] = 57; // SPACE
+		table[45] = 12; // MINUS
+		table[46] = 13; // EQUALS
+		table[47] = 26; // LEFTBRACKET
+		table[48] = 27; // RIGHTBRACKET
+		table[49] = 43; // BACKSLASH
+		table[51] = 39; // SEMICOLON
+		table[52] = 40; // APOSTROPHE
+		table[53] = 41; // GRAVE
+		table[54] = 51; // COMMA
+		table[55] = 52; // PERIOD
+		table[56] = 53; // SLASH
+		table[57] = 58; // CAPSLOCK
+		table[58] = 59; // F1
+		table[59] = 60; // F2
+		table[60] = 61; // F3
+		table[61] = 62; // F4
+		table[62] = 63; // F5
+		table[63] = 64; // F6
+		table[64] = 65; // F7
+		table[65] = 66; // F8
+		table[66] = 67; // F9
+		table[67] = 68; // F10
+		table[68] = 87; // F11
+		table[69] = 88; // F12
+		table[70] = 210; // PRINTSCREEN
+		table[71] = 70; // SCROLLLOCK
+		table[72] = 119; // PAUSE
+		table[73] = 110; // INSERT
+		table[74] = 102; // HOME
+		table[75] = 104; // PAGEUP
+		table[76] = 111; // DELETE
+		table[77] = 107; // END
+		table[78] = 109; // PAGEDOWN
+		table[79] = 106; // RIGHT
+		table[80] = 105; // LEFT
+		table[81] = 108; // DOWN
+		table[82] = 103; // UP
+		table[83] = 69; // NUMLOCKCLEAR
+		table[84] = 98; // KP_DIVIDE
+		table[85] = 55; // KP_MULTIPLY
+		table[86] = 74; // KP_MINUS
+		table[87] = 78; // KP_PLUS
+		table[88] = 96; // KP_ENTER
+		table[89] = 79; // KP_1
+		table[90] = 80; // KP_2
+		table[91] = 81; // KP_3
+		table[92] = 75; // KP_4
+		table[93] = 76; // KP_5
+		table[94] = 77; // KP_6
+		table[95] = 71; // KP_7
+		table[96] = 72; // KP_8
+		table[97] = 73; // KP_9
+		table[98] = 82; // KP_0
+		table[99] = 83; // KP_PERIOD
+		table[100] = 86; // NONUSBACKSLASH
+		table[101] = 127; // APPLICATION
+		table[102] = 116; // POWER
+		table[103] = 117; // KP_EQUALS
+		table[104] = 183; // F13
+		table[105] = 184; // F14
+		table[106] = 185; // F15
+		table[107] = 186; // F16
+		table[108] = 187; // F17
+		table[109] = 188; // F18
+		table[110] = 189; // F19
+		table[111] = 190; // F20
+		table[112] = 191; // F21
+		table[113] = 192; // F22
+		table[114] = 193; // F23
+		table[115] = 194; // F24
+		table[117] = 138; // HELP
+		table[118] = 139; // MENU
+		table[119] = 353; // SELECT
+		table[120] = 128; // STOP
+		table[121] = 129; // AGAIN
+		table[122] = 131; // UNDO
+		table[123] = 137; // CUT
+		table[124] = 133; // COPY
+		table[125] = 135; // PASTE
+		table[126] = 136; // FIND
+		table[127] = 113; // MUTE
+		table[128] = 115; // VOLUMEUP
+		table[129] = 114; // VOLUMEDOWN
+		table[133] = 121; // KP_COMMA
+		table[135] = 89; // INTERNATIONAL1
+		table[136] = 93; // INTERNATIONAL2
+		table[137] = 124; // INTERNATIONAL3
+		table[138] = 92; // INTERNATIONAL4
+		table[139] = 94; // INTERNATIONAL5
+		table[140] = 95; // INTERNATIONAL6
+		table[144] = 122; // LANG1
+		table[145] = 123; // LANG2
+		table[146] = 90; // LANG3
+		table[147] = 91; // LANG4
+		table[148] = 85; // LANG5
+		table[153] = 222; // ALTERASE
+		table[154] = 99; // SYSREQ
+		table[155] = 223; // CANCEL
+		table[156] = 355; // CLEAR
+		table[165] = 132; // FRONT
+		table[182] = 179; // KP_LEFTPAREN
+		table[183] = 180; // KP_RIGHTPAREN
+		table[215] = 118; // KP_PLUSMINUS
+		table[224] = 29; // LCTRL
+		table[225] = 42; // LSHIFT
+		table[226] = 56; // LALT
+		table[227] = 125; // LGUI
+		table[228] = 97; // RCTRL
+		table[229] = 54; // RSHIFT
+		table[230] = 100; // RALT
+		table[231] = 126; // RGUI
+		table[257] = 373; // MODE
+		table[258] = 142; // SLEEP
+		table[259] = 143; // WAKE
+		table[260] = 402; // CHANNEL_INCREMENT
+		table[261] = 403; // CHANNEL_DECREMENT
+		table[262] = 200; // MEDIA_PLAY
+		table[263] = 201; // MEDIA_PAUSE
+		table[264] = 167; // MEDIA_RECORD
+		table[265] = 208; // MEDIA_FAST_FORWARD
+		table[266] = 168; // MEDIA_REWIND
+		table[267] = 163; // MEDIA_NEXT_TRACK
+		table[268] = 165; // MEDIA_PREVIOUS_TRACK
+		table[269] = 166; // MEDIA_STOP
+		table[270] = 161; // MEDIA_EJECT
+		table[271] = 164; // MEDIA_PLAY_PAUSE
+		table[272] = 226; // MEDIA_SELECT
+		table[273] = 181; // AC_NEW
+		table[274] = 134; // AC_OPEN
+		table[275] = 206; // AC_CLOSE
+		table[276] = 174; // AC_EXIT
+		table[277] = 234; // AC_SAVE
+		table[279] = 130; // AC_PROPERTIES
+		table[280] = 217; // AC_SEARCH
+		table[281] = 172; // AC_HOME
+		table[282] = 158; // AC_BACK
+		table[283] = 159; // AC_FORWARD
+		table[285] = 173; // AC_REFRESH
+		table[286] = 156; // AC_BOOKMARKS
+
+		return table;
+	}
+
 	public static int correctScancode(int scancode) {
-		if("wayland".equals(SDLVideo.SDL_GetCurrentVideoDriver())) {
-			scancode += 8;
-		}
-		return scancode;
+		int evdev = (scancode >= 0 && scancode < SDL_SCANCODE_TO_EVDEV.length) ? SDL_SCANCODE_TO_EVDEV[scancode] : -1;
+		if(evdev < 0) evdev = scancode;
+		return evdev + 8;
 	}
 	
 	private void anchorToParent(WLCPopup popup) {
