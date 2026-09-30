@@ -49,7 +49,12 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         sed -i "s/^mod_version=.*/mod_version=${{ inputs.version }}/" gradle.properties
-        git commit -am "Release v${{ inputs.version }}${{ inputs.tag_suffix }}"
+        git add gradle.properties
+        # mod_version may already equal the dispatched version (e.g. cutting
+        # a release right after a version bump, or just a new tag_suffix on
+        # an unchanged version) -- skip the commit rather than failing on
+        # "nothing to commit" when sed produced no actual diff.
+        git diff --cached --quiet || git commit -m "Release v${{ inputs.version }}${{ inputs.tag_suffix }}"
         git tag "v${{ inputs.version }}${{ inputs.tag_suffix }}"
         git push origin HEAD:${{ github.ref_name }} "v${{ inputs.version }}${{ inputs.tag_suffix }}"
     - name: Resolve version/ref/changelog for later jobs
