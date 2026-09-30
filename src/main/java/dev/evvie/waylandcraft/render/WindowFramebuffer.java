@@ -114,7 +114,7 @@ public class WindowFramebuffer implements FramebufferRenderable {
 	
 	private static void ensureUniformStorage() {
 		if(uniformStorage == null) {
-			uniformStorage = new DynamicGpuDataStorageMapped<WindowInfoUniform>("window framebuffer", WindowInfoUniform.SIZE, 2, GpuBuffer.USAGE_UNIFORM);
+			uniformStorage = new DynamicGpuDataStorageMapped<WindowInfoUniform>("window framebuffer", WindowInfoUniform.SIZE, GpuBuffer.USAGE_UNIFORM, 2);
 		}
 	}
 	
