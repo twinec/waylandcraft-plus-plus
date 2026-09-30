@@ -62,10 +62,9 @@ jobs:
     - name: Setup gradle
       uses: gradle/actions/setup-gradle@v6
     - name: Build java code
-      run: ./gradlew diagMouseButton --console=plain # TEMPORARY
+      run: ./gradlew build --console=plain
     - name: Upload artifact
       uses: actions/upload-artifact@v7
       with:
         path: build/libs/waylandcraft_plus_plus.jar
         archive: false
-      if: false

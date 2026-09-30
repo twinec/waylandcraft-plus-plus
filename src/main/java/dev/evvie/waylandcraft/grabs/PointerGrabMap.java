@@ -51,7 +51,7 @@ public class PointerGrabMap {
 		if(implicitGrabs == null) return;
 		if(implicitGrabs.contains(button)) return;
 		
-		int serial = wlc.bridge.sendButton(0x110 + button, 1);
+		int serial = wlc.bridge.sendButton(WaylandCraft.correctButtonCode(button), 1);
 		implicitGrabs.add(button, serial);
 	}
 	
@@ -137,7 +137,7 @@ public class PointerGrabMap {
 		if(implicitGrabs == null) return;
 		
 		if(implicitGrabs.contains(button)) {
-			wlc.bridge.sendButton(0x110 + button, 0);
+			wlc.bridge.sendButton(WaylandCraft.correctButtonCode(button), 0);
 			implicitGrabs.remove(button);
 		}
 		
@@ -148,7 +148,7 @@ public class PointerGrabMap {
 		if(implicitGrabs == null) return;
 		
 		for(ButtonPress press : implicitGrabs.buttons) {
-			wlc.bridge.sendButton(0x110 + press.button, 0);
+			wlc.bridge.sendButton(WaylandCraft.correctButtonCode(press.button), 0);
 		}
 		implicitGrabs = null;
 	}

@@ -513,7 +513,7 @@ public class WindowManagerScreen extends Screen {
 		
 		if(implicitGrab != null && !implicitGrab.pressedMouseButtons.contains(event.button())) {
 			implicitGrab.pressedMouseButtons.add(event.button());
-			wlc.bridge.sendButton(0x110 + event.button(), 1);
+			wlc.bridge.sendButton(WaylandCraft.correctButtonCode(event.button()), 1);
 			
 			return true;
 		}
@@ -532,7 +532,7 @@ public class WindowManagerScreen extends Screen {
 		
 		if(implicitGrab != null && implicitGrab.pressedMouseButtons.contains(event.button())) {
 			implicitGrab.pressedMouseButtons.remove(event.button());
-			wlc.bridge.sendButton(0x110 + event.button(), 0);
+			wlc.bridge.sendButton(WaylandCraft.correctButtonCode(event.button()), 0);
 			
 			if(implicitGrab.pressedMouseButtons.isEmpty()) implicitGrab = null;
 			
@@ -608,7 +608,7 @@ public class WindowManagerScreen extends Screen {
 	public void removed() {
 		if(resizeMode) exitResizeMode();
 		if(implicitGrab != null) {
-			implicitGrab.pressedMouseButtons.forEach((button) -> wlc.bridge.sendButton(0x110 + button, 0));
+			implicitGrab.pressedMouseButtons.forEach((button) -> wlc.bridge.sendButton(WaylandCraft.correctButtonCode(button), 0));
 			implicitGrab = null;
 		}
 		wlc.bridge.deactivateKeyboard();

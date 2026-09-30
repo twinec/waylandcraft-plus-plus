@@ -631,11 +631,11 @@ public class WaylandCraft implements ClientModInitializer {
 		
 		if(pointerCapture != null) {
 			if(action == 1 && !pointerCapture.pressedButtons.contains(button)) {
-				bridge.sendButton(0x110 + button, 1);
+				bridge.sendButton(correctButtonCode(button), 1);
 				pointerCapture.pressedButtons.add(button);
 			}
 			else if(action == 0 && pointerCapture.pressedButtons.contains(button)) {
-				bridge.sendButton(0x110 + button, 0);
+				bridge.sendButton(correctButtonCode(button), 0);
 				pointerCapture.pressedButtons.remove(button);
 			}
 			else if(action == 0) {
@@ -734,7 +734,13 @@ public class WaylandCraft implements ClientModInitializer {
 	public boolean onKeyPress(long windowHandle, int key, int scancode, int action, int modifiers) {
 		if(bridge == null) return false;
 		
-		if(key == InputConstants.KEY_Q && modifiers == InputConstants.MOD_ALT) {
+		// MOD_ALT is now a combined left+right bitmask (0x300); a single Alt
+		// press only ever sets one of those two bits, so the old exact
+		// "modifiers == MOD_ALT" check (correct back when MOD_ALT was GLFW's
+		// single undifferentiated bit) never matched. Check "some Alt bit,
+		// nothing else" instead, ignoring caps/num lock state.
+		int relevantModifiers = modifiers & ~(InputConstants.MOD_CAPS_LOCK | InputConstants.MOD_NUM_LOCK);
+		if(key == InputConstants.KEY_Q && (relevantModifiers & InputConstants.MOD_ALT) != 0 && (relevantModifiers & ~InputConstants.MOD_ALT) == 0) {
 			if(action == 0) return true;
 			
 			if(keyboardCaptureMode != KeyboardCaptureMode.HARD_CAPTURE) {
@@ -967,6 +973,19 @@ public class WaylandCraft implements ClientModInitializer {
 		int evdev = (scancode >= 0 && scancode < SDL_SCANCODE_TO_EVDEV.length) ? SDL_SCANCODE_TO_EVDEV[scancode] : -1;
 		if(evdev < 0) evdev = scancode;
 		return evdev + 8;
+	}
+
+	/* SDL numbers mouse buttons 1-based (LEFT=1, MIDDLE=2, RIGHT=3, X1=4,
+	 * X2=5, ...), in a different order than the Linux evdev BTN_* codes our
+	 * embedded compositor's wl_pointer.button event expects (BTN_LEFT=0x110,
+	 * BTN_RIGHT=0x111, BTN_MIDDLE=0x112, then BTN_SIDE/BTN_EXTRA/...). A
+	 * flat "0x110 + button" offset (this port's old GLFW-derived code)
+	 * mismatches every button by one, and swaps middle/right outright.
+	 */
+	public static int correctButtonCode(int sdlButton) {
+		if(sdlButton == 2) return 0x112; // BTN_MIDDLE
+		if(sdlButton == 3) return 0x111; // BTN_RIGHT
+		return 0x110 + (sdlButton - 1);
 	}
 	
 	private void anchorToParent(WLCPopup popup) {
