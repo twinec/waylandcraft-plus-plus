@@ -6,8 +6,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g. 3.1) -- becomes tag vX.Y and the mod_version in gradle.properties'
+        description: 'Version to release (e.g. 3.1) -- becomes the mod_version in gradle.properties'
         required: true
+      tag_suffix:
+        description: 'Suffix appended only to the git tag/GitHub release (e.g. "-26.3"), never to mod_version -- keeps this release line''s tags from colliding with another line''s tags of the same version number'
+        required: false
+        default: '-26.3'
       changelog:
         description: 'Changelog for this version (optional)'
         required: false
@@ -45,9 +49,9 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         sed -i "s/^mod_version=.*/mod_version=${{ inputs.version }}/" gradle.properties
-        git commit -am "Release v${{ inputs.version }}"
-        git tag "v${{ inputs.version }}"
-        git push origin HEAD:${{ github.ref_name }} "v${{ inputs.version }}"
+        git commit -am "Release v${{ inputs.version }}${{ inputs.tag_suffix }}"
+        git tag "v${{ inputs.version }}${{ inputs.tag_suffix }}"
+        git push origin HEAD:${{ github.ref_name }} "v${{ inputs.version }}${{ inputs.tag_suffix }}"
     - name: Resolve version/ref/changelog for later jobs
       id: resolve
       run: |
@@ -56,7 +60,11 @@ jobs:
         # random delimiter is required so embedded newlines don't corrupt it.
         delim="EOF_$(uuidgen)"
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          echo "ref=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          # ref/tag carries tag_suffix (e.g. "-26.3") to keep this line's tags
+          # from colliding with another release line's tags of the same
+          # version number; version is the plain mod_version, no suffix --
+          # that's what gets built into the jar and shown in Mod Menu.
+          echo "ref=v${{ inputs.version }}${{ inputs.tag_suffix }}" >> "$GITHUB_OUTPUT"
           echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
           {
             echo "changelog<<$delim"
