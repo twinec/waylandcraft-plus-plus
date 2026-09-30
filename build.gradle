@@ -139,10 +139,9 @@ jar {
 tasks.register("diagRegistrySync2") {
 	doLast {
 		def classNames = [
-			"net.fabricmc.fabric.impl.registry.sync.RegistrySyncManager",
-			"net.fabricmc.fabric.impl.registry.sync.RegistryAttributeImpl",
-			"net.fabricmc.fabric.impl.registry.sync.validate.RegistryCustomContentState",
-			"net.fabricmc.fabric.impl.registry.sync.validate.Details"
+			"net.fabricmc.fabric.impl.registry.sync.RegistrySyncManager\$SyncConfigurationTask",
+			"net.fabricmc.fabric.impl.registry.sync.trackers.IdMapperTracker",
+			"net.fabricmc.fabric.impl.registry.sync.RemappableRegistry"
 		]
 		def workDir = file("${buildDir}/diagRegistrySync2")
 		workDir.deleteDir()
