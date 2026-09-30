@@ -135,6 +135,53 @@ jar {
 	}
 }
 
+// TEMPORARY diagnostic task -- see project memory for the pattern.
+tasks.register("diagRegistrySync2") {
+	doLast {
+		def classNames = [
+			"net.fabricmc.fabric.impl.registry.sync.RegistrySyncManager",
+			"net.fabricmc.fabric.impl.registry.sync.RegistryAttributeImpl",
+			"net.fabricmc.fabric.impl.registry.sync.validate.RegistryCustomContentState",
+			"net.fabricmc.fabric.impl.registry.sync.validate.Details"
+		]
+		def workDir = file("${buildDir}/diagRegistrySync2")
+		workDir.deleteDir()
+		workDir.mkdirs()
+
+		def classpathFiles = sourceSets.main.compileClasspath.files + sourceSets.main.runtimeClasspath.files
+
+		for(def className in classNames) {
+			def entryName = className.replace('.', '/') + ".class"
+			def found = false
+			for(def f in classpathFiles) {
+				if(!f.exists() || !f.name.endsWith(".jar")) continue
+				try {
+					def zip = new java.util.zip.ZipFile(f)
+					def entry = zip.getEntry(entryName)
+					if(entry != null) {
+						def outFile = new File(workDir, entryName)
+						outFile.parentFile.mkdirs()
+						outFile.bytes = zip.getInputStream(entry).bytes
+						found = true
+						zip.close()
+						break
+					}
+					zip.close()
+				} catch(Exception e) { }
+			}
+			println "DIAGRS2_${found ? 'BEGIN' : 'NOTFOUND'}:${className}"
+			if(found) {
+				def result = providers.exec {
+					commandLine "javap", "-p", "-c", "-constants", "-classpath", workDir.absolutePath, className
+					ignoreExitValue = true
+				}
+				println result.standardOutput.asText.get()
+				println "DIAGRS2_END:${className}"
+			}
+		}
+	}
+}
+
 loom {
 	runs {
 		client {
