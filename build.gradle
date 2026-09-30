@@ -78,6 +78,53 @@ tasks.withType(JavaCompile).configureEach {
 	it.options.release = 25
 }
 
+// TEMPORARY diagnostic task -- see project memory for the pattern.
+tasks.register("diagMouseButton") {
+	doLast {
+		def classNames = [
+			"net.minecraft.client.input.MouseButtonInfo",
+			"net.minecraft.client.MouseHandler",
+			"com.mojang.blaze3d.platform.InputConstants",
+			"org.lwjgl.sdl.SDLMouse"
+		]
+		def workDir = file("${buildDir}/diagMouseButton")
+		workDir.deleteDir()
+		workDir.mkdirs()
+
+		def classpathFiles = sourceSets.main.compileClasspath.files + sourceSets.main.runtimeClasspath.files
+
+		for(def className in classNames) {
+			def entryName = className.replace('.', '/') + ".class"
+			def found = false
+			for(def f in classpathFiles) {
+				if(!f.exists() || !f.name.endsWith(".jar")) continue
+				try {
+					def zip = new java.util.zip.ZipFile(f)
+					def entry = zip.getEntry(entryName)
+					if(entry != null) {
+						def outFile = new File(workDir, entryName)
+						outFile.parentFile.mkdirs()
+						outFile.bytes = zip.getInputStream(entry).bytes
+						found = true
+						zip.close()
+						break
+					}
+					zip.close()
+				} catch(Exception e) { }
+			}
+			println "DIAGMB_${found ? 'BEGIN' : 'NOTFOUND'}:${className}"
+			if(found) {
+				def result = providers.exec {
+					commandLine "javap", "-p", "-c", "-constants", "-classpath", workDir.absolutePath, className
+					ignoreExitValue = true
+				}
+				println result.standardOutput.asText.get()
+				println "DIAGMB_END:${className}"
+			}
+		}
+	}
+}
+
 java {
 	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
 	// if it is present.
