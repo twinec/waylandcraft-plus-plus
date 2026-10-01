@@ -159,7 +159,7 @@ public class WaylandCraft implements ClientModInitializer {
 		// packet always omits "server entries" like WINDOW).
 		ClientConfigurationNetworking.registerGlobalReceiver(ClientboundWindowRawIdPayload.TYPE, (payload, ctx) -> {
 			Object2IntMap<Identifier> remap = new Object2IntOpenHashMap<>();
-			remap.put(BuiltInRegistries.ITEM.getKey(WindowItem.WINDOW), payload.rawId());
+			remap.put(WindowItem.WINDOW_RESOURCE_KEY.location(), payload.rawId());
 			try {
 				((RemappableRegistry) BuiltInRegistries.ITEM).remap(remap, RemappableRegistry.RemapMode.REMOTE);
 			}
