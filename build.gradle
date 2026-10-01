@@ -108,13 +108,10 @@ tasks.register("diagPolymerApi") {
 				continue
 			}
 			println "DIAGPOLY_BEGIN: ${name}"
-			def out = new ByteArrayOutputStream()
-			providers.exec {
-				commandLine "javap", "-p", "-c", "-constants", "-classpath", tmp.toString(), name
-				standardOutput = out
-				errorOutput = out
-			}.result.get()
-			println out.toString()
+			def proc = ["javap", "-p", "-c", "-constants", "-classpath", tmp.toString(), name].execute()
+			proc.waitFor()
+			println proc.in.text
+			println proc.err.text
 			println "DIAGPOLY_END: ${name}"
 		}
 		for(prefix in listPrefixes) {
