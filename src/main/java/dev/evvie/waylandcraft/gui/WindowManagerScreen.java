@@ -202,8 +202,13 @@ public class WindowManagerScreen extends Screen {
 	
 	private void onGrabPressed(Button button) {
 		if(focused == null) return;
-		
-		wlc.pointerGrabs.startExclusive(new WindowGrab(wlc.getOrCreateDisplay(focused), 0));
+
+		// 1, not 0 -- SDL's left mouse button code (see WaylandCraft#correctButtonCode),
+		// since this is what later arrives in onButtonPress() to release the grab.
+		// Every other grab inherits its button from an already-pressed implicit grab
+		// instead of hardcoding one; this is the only grab started without a real
+		// button press behind it (a GUI button click), so it has to pick one itself.
+		wlc.pointerGrabs.startExclusive(new WindowGrab(wlc.getOrCreateDisplay(focused), 1));
 		this.onClose();
 	}
 	
