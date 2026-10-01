@@ -74,18 +74,18 @@ processResources {
 	}
 }
 
-// TEMPORARY diagnostic task -- dumps Polymer's item-sync payload classes
-// to investigate a live "Failed to decode packet ... (polymer:sync/items)"
-// crash reported after making polymer-core a hard dependency.
+// TEMPORARY diagnostic task -- dumps fabric-registry-sync-v0's client-side
+// remap API so a real WaylandCraft client can be told the authoritative
+// raw id for its one Polymer "server entry" item, instead of relying on
+// client and server independently computing the same tail slot (confirmed
+// unreliable: any extra client-side mod shifts the client's own count).
 tasks.register("diagPolymerSync") {
 	doLast {
 		def classNames = [
-			"eu.pb4.polymer.core.impl.networking.entry.PolymerItemEntry",
-			"eu.pb4.polymer.core.impl.networking.entry.IdValueEntry",
-			"eu.pb4.polymer.core.impl.other.ImplPolymerRegistry",
-			"eu.pb4.polymer.core.impl.other.ImplPolymerRegistry\$Key",
-			"eu.pb4.polymer.core.impl.other.FixedIdList",
-			"eu.pb4.polymer.core.impl.networking.S2CPackets",
+			"net.fabricmc.fabric.impl.registry.sync.RemappableRegistry",
+			"net.fabricmc.fabric.impl.registry.sync.RemapException",
+			"net.fabricmc.fabric.impl.registry.sync.RemapStateImpl",
+			"net.fabricmc.fabric.api.event.registry.RegistryIdRemapCallback",
 		]
 		def jars = sourceSets.main.compileClasspath.files + sourceSets.main.runtimeClasspath.files
 		def tmp = File.createTempDir()
