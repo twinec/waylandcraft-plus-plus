@@ -27,7 +27,7 @@ public record ClientboundWindowRawIdPayload(int rawId) implements CustomPacketPa
 
 	public static final CustomPacketPayload.Type<ClientboundWindowRawIdPayload> TYPE = new CustomPacketPayload.Type<ClientboundWindowRawIdPayload>(WINDOW_RAW_ID_PAYLOAD_ID);
 
-	public static final StreamCodec<FriendlyByteBuf, ClientboundWindowRawIdPayload> CODEC = ByteBufCodecs.VAR_INT.map(ClientboundWindowRawIdPayload::new, ClientboundWindowRawIdPayload::rawId);
+	public static final StreamCodec<FriendlyByteBuf, ClientboundWindowRawIdPayload> CODEC = StreamCodec.composite(ByteBufCodecs.VAR_INT, ClientboundWindowRawIdPayload::rawId, ClientboundWindowRawIdPayload::new);
 
 	@Override
 	public Type<? extends CustomPacketPayload> type() {
