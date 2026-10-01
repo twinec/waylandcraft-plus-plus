@@ -82,10 +82,8 @@ processResources {
 tasks.register("diagPolymerSync") {
 	doLast {
 		def classNames = [
-			"net.fabricmc.fabric.impl.registry.sync.RemappableRegistry",
-			"net.fabricmc.fabric.impl.registry.sync.RemapException",
-			"net.fabricmc.fabric.impl.registry.sync.RemapStateImpl",
-			"net.fabricmc.fabric.api.event.registry.RegistryIdRemapCallback",
+			"net.fabricmc.fabric.impl.registry.sync.RemappableRegistry\$RemapMode",
+			"net.fabricmc.fabric.impl.registry.sync.RegistrySyncManager",
 		]
 		def jars = sourceSets.main.compileClasspath.files + sourceSets.main.runtimeClasspath.files
 		def tmp = File.createTempDir()
