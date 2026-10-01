@@ -52,13 +52,7 @@ import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.impl.registry.sync.RemapException;
-import net.fabricmc.fabric.impl.registry.sync.RemappableRegistry;
 import dev.evvie.waylandcraft.network.ClientboundHelloPayload;
-import dev.evvie.waylandcraft.network.ClientboundWindowRawIdPayload;
-import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionContext;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelExtractionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
@@ -146,27 +140,6 @@ public class WaylandCraft implements ClientModInitializer {
 		// (kept so the channel is still announced there too).
 		ClientConfigurationNetworking.registerGlobalReceiver(ClientboundHelloPayload.TYPE, (payload, ctx) -> {});
 		ClientPlayNetworking.registerGlobalReceiver(ClientboundHelloPayload.TYPE, (payload, ctx) -> {});
-
-		// Our own registry id for WINDOW (independently computed by Polymer's
-		// registry-sync-manipulator mixin reordering it to the tail of our
-		// local item registry) only agrees with the server's if both sides
-		// registered the exact same total set of items beforehand -- not true
-		// for a client with any extra item-registering mods the server
-		// doesn't have. Rather than trust our own computation, apply the
-		// server's authoritative id directly via fabric-registry-sync's own
-		// remap mechanism (the same one it uses internally to apply its
-		// regular sync packet, just scoped to this one entry since that
-		// packet always omits "server entries" like WINDOW).
-		ClientConfigurationNetworking.registerGlobalReceiver(ClientboundWindowRawIdPayload.TYPE, (payload, ctx) -> {
-			Object2IntMap<Identifier> remap = new Object2IntOpenHashMap<>();
-			remap.put(WindowItem.WINDOW_RESOURCE_KEY.location(), payload.rawId());
-			try {
-				((RemappableRegistry) BuiltInRegistries.ITEM).remap(remap, RemappableRegistry.RemapMode.REMOTE);
-			}
-			catch(RemapException e) {
-				WaylandCraftCommon.LOGGER.error("Failed to apply WaylandCraft's server-authoritative raw id for WINDOW", e);
-			}
-		});
 
 		keyOpenScreen = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.windowManager", InputConstants.Type.KEYBOARD, InputConstants.KEY_B, KEYBIND_CATEGORY));
 		keyOpenAppLauncher = KeyMappingHelper.registerKeyMapping(new KeyMapping("waylandcraft.key.appLauncher", InputConstants.Type.KEYBOARD, InputConstants.KEY_V, KEYBIND_CATEGORY));

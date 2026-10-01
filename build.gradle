@@ -74,6 +74,47 @@ processResources {
 	}
 }
 
+// TEMPORARY diagnostic task -- dumps fabric-registry-sync-v0's client-side
+// remap API so a real WaylandCraft client can be told the authoritative
+// raw id for its one Polymer "server entry" item, instead of relying on
+// client and server independently computing the same tail slot (confirmed
+// unreliable: any extra client-side mod shifts the client's own count).
+tasks.register("diagPolymerSync") {
+	doLast {
+		def jars = sourceSets.main.compileClasspath.files + sourceSets.main.runtimeClasspath.files
+		def tmp = File.createTempDir()
+		def prefix = "net/fabricmc/fabric/impl/registry/sync/"
+		def allPaths = [] as Set
+		for(jarFile in jars) {
+			if(!jarFile.name.endsWith(".jar")) continue
+			new java.util.zip.ZipFile(jarFile).withCloseable { zf ->
+				zf.entries().each { entry ->
+					if(!entry.isDirectory() && entry.name.startsWith(prefix) && entry.name.endsWith(".class") && !entry.name.contains('$')) {
+						allPaths.add(entry.name)
+						def outFile = new File(tmp, entry.name)
+						outFile.parentFile.mkdirs()
+						outFile.bytes = zf.getInputStream(entry).bytes
+					}
+				}
+			}
+		}
+		println "DIAGSYNC_LISTING_BEGIN"
+		allPaths.sort().each { println "DIAGSYNC_CLASS: ${it}" }
+		println "DIAGSYNC_LISTING_END"
+
+		def interesting = allPaths.findAll { it =~ /(?i)(client|packet|handler|listener|network)/ }
+		for(path in interesting) {
+			def name = path.replace('/', '.').replace('.class', '')
+			println "DIAGSYNC_BEGIN: ${name}"
+			def proc = ["javap", "-p", "-c", "-constants", "-classpath", tmp.toString(), name].execute()
+			proc.waitFor()
+			println proc.in.text
+			println proc.err.text
+			println "DIAGSYNC_END: ${name}"
+		}
+	}
+}
+
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = 25
 }
