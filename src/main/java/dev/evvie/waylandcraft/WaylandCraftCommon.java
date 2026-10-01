@@ -25,7 +25,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.loader.api.FabricLoader;
 
 public class WaylandCraftCommon implements ModInitializer {
 	
@@ -71,19 +70,10 @@ public class WaylandCraftCommon implements ModInitializer {
 		instance = this;
 		WindowItem.register();
 
-		// Must be gated here, before PolymerCompat is referenced at all --
-		// PolymerCompat implements Polymer's PolymerItem interface on a
-		// nested class, and merely loading that class (which happens as
-		// soon as any of its methods are invoked, regardless of an internal
-		// isModLoaded guard) throws NoClassDefFoundError when polymer-core
-		// isn't present, since verifying its bytecode requires resolving
-		// PolymerItem.
-		if(FabricLoader.getInstance().isModLoaded("polymer-core")) {
-			LOGGER.info("polymer-core detected, registering Polymer compat");
-			PolymerCompat.register();
-		} else {
-			LOGGER.info("polymer-core not detected, skipping Polymer compat");
-		}
+		// polymer-core is a hard dependency (see fabric.mod.json) -- Fabric
+		// Loader won't start the mod without it, so no isModLoaded guard is
+		// needed here.
+		PolymerCompat.register();
 
 		WaylandCraftNetworking.register();
 		SharingNetworking.register(sharingServer);
