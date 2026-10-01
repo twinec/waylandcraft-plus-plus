@@ -80,12 +80,16 @@ processResources {
 tasks.register("diagPolymerApi") {
 	doLast {
 		def classNames = [
-			"eu.pb4.polymer.core.api.item.PolymerItem",
-			"eu.pb4.polymer.core.api.utils.PolymerSyncedObject",
-			"eu.pb4.polymer.core.api.utils.PolymerClientDecoded",
-			"eu.pb4.polymer.core.impl.CommonImpl",
+			"eu.pb4.polymer.networking.api.PolymerNetworking",
+			"eu.pb4.polymer.networking.api.server.PolymerHandshakeHandler",
+			"eu.pb4.polymer.networking.api.server.PolymerServerNetworking",
+			"eu.pb4.polymer.networking.api.client.PolymerClientNetworking",
+			"eu.pb4.polymer.rsm.api.RegistrySyncUtils",
+			"eu.pb4.polymer.rsm.impl.CompatStatus",
+			"eu.pb4.polymer.rsm.impl.RegSyncImplUtil",
+			"eu.pb4.polymer.rsm.impl.RegistrySyncExtension",
 		]
-		def listPrefixes = ["eu/pb4/polymer/"]
+		def listPrefixes = []
 		def jars = sourceSets.main.compileClasspath.files + sourceSets.main.runtimeClasspath.files
 		def tmp = File.createTempDir()
 		for(name in classNames) {
