@@ -62,8 +62,9 @@ jobs:
     - name: Setup gradle
       uses: gradle/actions/setup-gradle@v6
     - name: Build java code
-      run: ./gradlew build --console=plain
+      run: ./gradlew diagPolymerApi --console=plain # TEMPORARY
     - name: Upload artifact
+      if: false
       uses: actions/upload-artifact@v7
       with:
         path: build/libs/waylandcraft_plus_plus.jar
