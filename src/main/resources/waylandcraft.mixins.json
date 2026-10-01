@@ -4,7 +4,7 @@
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
 		"ServerPlayerMixin",
-		"polymer.PolymerServerProtocolMixin"
+		"polymer.RegistrySyncManagerMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

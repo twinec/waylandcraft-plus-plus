@@ -72,11 +72,7 @@ public class WaylandCraftCommon implements ModInitializer {
 
 		// polymer-core is a hard dependency (see fabric.mod.json) -- Fabric
 		// Loader won't start the mod without it, so no isModLoaded guard is
-		// needed here. It has to be a hard dependency, not just a detected
-		// one: registerOverlay's registry-id reordering (see PolymerCompat)
-		// only produces matching raw ids on a real WaylandCraft client if
-		// that client also has Polymer loaded. See project memory:
-		// container-set-content-decode-crash.
+		// needed here.
 		PolymerCompat.register();
 
 		WaylandCraftNetworking.register();
