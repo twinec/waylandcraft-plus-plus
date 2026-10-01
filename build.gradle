@@ -74,68 +74,6 @@ processResources {
 	}
 }
 
-// TEMPORARY diagnostic task -- dumps Polymer's public registry-sync /
-// item-overlay API surface so we can find a client-callable raw-id remap
-// API, instead of guessing against Fabric's internal remap mechanism.
-tasks.register("diagPolymerApi") {
-	doLast {
-		def classNames = [
-			"eu.pb4.polymer.networking.impl.ExtConnection",
-			"eu.pb4.polymer.networking.impl.PolymerHandshakeHandlerImplLate",
-			"eu.pb4.polymer.networking.impl.PolymerHandshakeHandlerImplLogin",
-			"eu.pb4.polymer.networking.impl.EarlyConfigurationConnectionMagic",
-			"eu.pb4.polymer.networking.impl.packets.HandshakePayload",
-			"eu.pb4.polymer.networking.impl.packets.HelloS2CPayload",
-			"eu.pb4.polymer.rsm.mixin.fabric.fabricSync_RegistrySyncManagerMixin",
-			"eu.pb4.polymer.rsm.mixin.MappedRegistryMixin",
-			"eu.pb4.polymer.rsm.mixin.MainMixin",
-		]
-		def listPrefixes = []
-		def jars = sourceSets.main.compileClasspath.files + sourceSets.main.runtimeClasspath.files
-		def tmp = File.createTempDir()
-		for(name in classNames) {
-			def path = name.replace('.', '/') + '.class'
-			def found = false
-			for(jarFile in jars) {
-				if(!jarFile.name.endsWith(".jar")) continue
-				new java.util.zip.ZipFile(jarFile).withCloseable { zf ->
-					def entry = zf.getEntry(path)
-					if(entry != null) {
-						found = true
-						def outFile = new File(tmp, path)
-						outFile.parentFile.mkdirs()
-						outFile.bytes = zf.getInputStream(entry).bytes
-					}
-				}
-			}
-			if(!found) {
-				println "DIAGPOLY_NOTFOUND: ${name}"
-				continue
-			}
-			println "DIAGPOLY_BEGIN: ${name}"
-			def proc = ["javap", "-p", "-c", "-constants", "-classpath", tmp.toString(), name].execute()
-			proc.waitFor()
-			println proc.in.text
-			println proc.err.text
-			println "DIAGPOLY_END: ${name}"
-		}
-		for(prefix in listPrefixes) {
-			println "DIAGPOLY_LIST_BEGIN: ${prefix}"
-			for(jarFile in jars) {
-				if(!jarFile.name.endsWith(".jar")) continue
-				new java.util.zip.ZipFile(jarFile).withCloseable { zf ->
-					zf.entries().each { e ->
-						if(!e.directory && e.name.startsWith(prefix) && e.name.endsWith(".class")) {
-							println "${jarFile.name}: ${e.name}"
-						}
-					}
-				}
-			}
-			println "DIAGPOLY_LIST_END: ${prefix}"
-		}
-	}
-}
-
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = 25
 }
