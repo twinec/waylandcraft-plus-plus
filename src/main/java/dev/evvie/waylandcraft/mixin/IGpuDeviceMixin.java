@@ -3,10 +3,10 @@ package dev.evvie.waylandcraft.mixin;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.GpuDeviceBackend;
+import com.mojang.renderpearl.backend.api.GpuDeviceBackend;
+import com.mojang.renderpearl.frontend.FrontendGpuDevice;
 
-@Mixin(GpuDevice.class)
+@Mixin(FrontendGpuDevice.class)
 public interface IGpuDeviceMixin {
 
 	@Accessor("backend")

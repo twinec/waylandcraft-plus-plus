@@ -4,7 +4,7 @@ import java.nio.ByteBuffer;
 import java.util.Optional;
 
 import org.joml.Vector4f;
-import org.lwjgl.glfw.GLFW;
+import org.lwjgl.sdl.SDLVideo;
 import org.lwjgl.opengl.GL33;
 import org.lwjgl.system.JNI;
 import org.lwjgl.system.MemoryStack;
@@ -14,35 +14,37 @@ import org.lwjgl.vulkan.VK12;
 import org.lwjgl.vulkan.VkBufferImageCopy;
 import org.lwjgl.vulkan.VkImageSubresourceLayers;
 
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.PrimitiveTopology;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.opengl.GlDevice;
-import com.mojang.blaze3d.opengl.GlStateManager;
-import com.mojang.blaze3d.opengl.GlTexture;
-import com.mojang.blaze3d.pipeline.BlendFunction;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.pipeline.BlendFunction;
+import com.mojang.renderpearl.api.pipeline.ColorTargetState;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
-import com.mojang.blaze3d.systems.GpuDeviceBackend;
-import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.vulkan.VulkanCommandEncoder;
-import com.mojang.blaze3d.vulkan.VulkanDevice;
-import com.mojang.blaze3d.vulkan.VulkanGpuBuffer;
-import com.mojang.blaze3d.vulkan.VulkanGpuTexture;
+import com.mojang.renderpearl.backend.api.GpuDeviceBackend;
+import com.mojang.renderpearl.backend.opengl.GlStateManager;
+import com.mojang.renderpearl.backend.opengl.GlTexture;
+import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
+import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
+import com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer;
+import com.mojang.renderpearl.backend.vulkan.VulkanGpuTexture;
 
 import dev.evvie.waylandcraft.WaylandCraft;
 import dev.evvie.waylandcraft.WaylandCraftCommon;
 import dev.evvie.waylandcraft.bridge.dmabuf.Dmabuf;
 import dev.evvie.waylandcraft.egl.EGL;
 import dev.evvie.waylandcraft.egl.EGLHelper;
+import dev.evvie.waylandcraft.mixin.IGlDeviceMixin;
 import dev.evvie.waylandcraft.mixin.IGlTextureMixin;
+import dev.evvie.waylandcraft.mixin.IGpuDeviceMixin;
+import dev.evvie.waylandcraft.mixin.IVulkanCommandEncoderMixin;
 import dev.evvie.waylandcraft.vulkan.VulkanHelper;
 import dev.evvie.waylandcraft.vulkan.VulkanHelper.ImportedDmabufVulkan;
 import it.unimi.dsi.fastutil.ints.IntIntImmutablePair;
@@ -69,8 +71,8 @@ public abstract class BufferTexture {
 	public abstract void release();
 	
 	public static BufferTexture createShmTexture(long ptr, int width, int height, int format, int stride) {
-		GpuDeviceBackend deviceBackend = RenderSystem.getDevice().backend;
-		if(deviceBackend instanceof GlDevice) {
+		GpuDeviceBackend deviceBackend = ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend();
+		if(deviceBackend instanceof IGlDeviceMixin) {
 			return new GlShmBufferTexture(ptr, width, height, format, stride);
 		}
 		else if(deviceBackend instanceof VulkanDevice) {
@@ -85,8 +87,8 @@ public abstract class BufferTexture {
 	}
 	
 	public static DmabufTexture createDmabufTexture(Dmabuf dmabuf) throws DmabufImportFailedException {
-		GpuDeviceBackend deviceBackend = RenderSystem.getDevice().backend;
-		if(deviceBackend instanceof GlDevice) {
+		GpuDeviceBackend deviceBackend = ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend();
+		if(deviceBackend instanceof IGlDeviceMixin) {
 			return new GlDmabufTexture(dmabuf);
 		}
 		else if(deviceBackend instanceof VulkanDevice) {
@@ -138,7 +140,7 @@ public abstract class BufferTexture {
 			super(width, height, format);
 			this.id = GlStateManager._genTexture();
 			
-			texture = IGlTextureMixin.createTexture(GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, "buffertexture-" + this.hashCode(), GpuFormat.RGBA8_UINT, width, height, 1, 1, id, ((GlDevice) RenderSystem.getDevice().backend).frameBufferCache());
+			texture = IGlTextureMixin.createTexture(GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, "buffertexture-" + this.hashCode(), GpuFormat.RGBA8_UINT, width, height, 1, 1, id, ((IGlDeviceMixin) ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend()).invokeFrameBufferCache());
 			textureView = RenderSystem.getDevice().createTextureView(texture);
 		}
 		
@@ -207,7 +209,7 @@ public abstract class BufferTexture {
 		private void writeTextureData(long ptr, int width, int height, int stride) {
 			int uploadSize = stride * height;
 			ByteBuffer buf = MemoryUtil.memByteBuffer(ptr, uploadSize);
-			VulkanCommandEncoder commandEncoder = (VulkanCommandEncoder) RenderSystem.getDevice().createCommandEncoder().backend;
+			VulkanCommandEncoder commandEncoder = (VulkanCommandEncoder) ((VulkanDevice) ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend()).createCommandEncoder();
 			
 			GpuBufferSlice stagingBuffer = commandEncoder.transientMemory().uploadStaging(buf, 1L, GpuBuffer.USAGE_COPY_SRC);
 			try(MemoryStack stack = MemoryStack.stackPush()) {
@@ -222,8 +224,8 @@ public abstract class BufferTexture {
 				imageSubresource.layerCount(1);
 				region.imageOffset().set(0, 0, 0);
 				region.imageExtent().set(width, height, 1);
-				VK12.vkCmdCopyBufferToImage(commandEncoder.commandBuffer(), ((VulkanGpuBuffer) stagingBuffer.buffer()).vkBuffer(), texture.vkImage(), 1, region);
-				commandEncoder.memoryBarrier(stack);
+				VK12.vkCmdCopyBufferToImage(((IVulkanCommandEncoderMixin) commandEncoder).invokeCommandBuffer(), ((VulkanGpuBuffer) stagingBuffer.buffer()).vkBuffer(), texture.vkImage(), 1, region);
+				((IVulkanCommandEncoderMixin) commandEncoder).invokeMemoryBarrier(stack);
 			}
 		}
 		
@@ -263,7 +265,7 @@ public abstract class BufferTexture {
 			super(buf.width(), buf.height(), BufferTexture.FORMAT_ARGB8888);
 			this.handle = buf.handle();
 			
-			target = new TextureTarget("dmabuf-target-" + this.hashCode(), width, height, false, GpuFormat.RGBA8_UNORM);
+			target = new TextureTarget("dmabuf-target-" + this.hashCode(), width, height, GpuFormat.RGBA8_UNORM, null);
 		}
 		
 		// Destroys internal data
@@ -279,9 +281,9 @@ public abstract class BufferTexture {
 			if(internalTexture == null) return;
 			
 			try(RenderPass renderPass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Dmabuf blit", target.getColorTextureView(), Optional.of(new Vector4f(0, 0, 0, 0)))) {
-				renderPass.setPipeline(DMABUF_BLIT);
+				renderPass.setPipeline(RenderSystem.getCompiledPipeline(DMABUF_BLIT));
 				RenderSystem.bindDefaultUniforms(renderPass);
-				renderPass.bindTexture("InSampler", internalView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+				renderPass.setUniform("InSampler", internalView, RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
 				renderPass.draw(3, 1, 0, 0);
 			}
 		}
@@ -331,10 +333,10 @@ public abstract class BufferTexture {
 			GlStateManager._texParameter(GL33.GL_TEXTURE_2D, GL33.GL_TEXTURE_MIN_FILTER, GL33.GL_LINEAR);
 			GlStateManager._texParameter(GL33.GL_TEXTURE_2D, GL33.GL_TEXTURE_MAG_FILTER, GL33.GL_NEAREST);
 			
-			long glEGLImageTargetTexture2DOES = GLFW.glfwGetProcAddress("glEGLImageTargetTexture2DOES");
+			long glEGLImageTargetTexture2DOES = SDLVideo.SDL_GL_GetProcAddress("glEGLImageTargetTexture2DOES");
 			JNI.invokeJV(GL33.GL_TEXTURE_2D, eglImage, glEGLImageTargetTexture2DOES);
 			
-			GlTexture glTexture = IGlTextureMixin.createTexture(GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, "eglimage-" + this.hashCode(), GpuFormat.RGBA8_UINT, width, height, 1, 1, eglImageTex, ((GlDevice) RenderSystem.getDevice().backend).frameBufferCache());
+			GlTexture glTexture = IGlTextureMixin.createTexture(GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING, "eglimage-" + this.hashCode(), GpuFormat.RGBA8_UINT, width, height, 1, 1, eglImageTex, ((IGlDeviceMixin) ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend()).invokeFrameBufferCache());
 			internalTexture = glTexture;
 			internalView = RenderSystem.getDevice().createTextureView(internalTexture);
 		}

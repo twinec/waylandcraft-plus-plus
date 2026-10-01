@@ -17,6 +17,7 @@
 		"IGlTextureMixin",
 		"IGlDeviceMixin",
 		"IGpuDeviceMixin",
+		"IVulkanCommandEncoderMixin",
 		"FramerateLimitTrackerMixin",
 		"TitleScreenMixin",
 		"PauseScreenMixin",

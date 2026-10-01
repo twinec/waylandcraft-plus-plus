@@ -55,7 +55,8 @@ dependencies {
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-	compileOnly "maven.modrinth:iris:${project.iris_version}"
+	// Vendored -- not yet published on Modrinth's maven for 26.3, see gradle.properties
+	compileOnly files("libs/iris-fabric-1.11.6+mc26.3.jar")
 
 	// Window sharing: pure-Java H.264 (JCodec) and Opus (Concentus), bundled in the jar
 	// so every client can decode shared windows

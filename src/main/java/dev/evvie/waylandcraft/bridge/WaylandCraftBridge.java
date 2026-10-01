@@ -15,10 +15,9 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.Platform;
 
-import com.mojang.blaze3d.opengl.GlDevice;
-import com.mojang.blaze3d.systems.GpuDeviceBackend;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vulkan.VulkanDevice;
+import com.mojang.renderpearl.backend.api.GpuDeviceBackend;
+import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 
 import dev.evvie.waylandcraft.WaylandCraftCommon;
 import dev.evvie.waylandcraft.bridge.WLCAbstractWindow.SurfaceGeometry;
@@ -28,6 +27,9 @@ import dev.evvie.waylandcraft.bridge.dmabuf.DmabufFormat;
 import dev.evvie.waylandcraft.desktop.RawDesktopEntry;
 import dev.evvie.waylandcraft.egl.EGL;
 import dev.evvie.waylandcraft.egl.EGLHelper;
+import dev.evvie.waylandcraft.gpu.EglAvailability;
+import dev.evvie.waylandcraft.mixin.IGlDeviceMixin;
+import dev.evvie.waylandcraft.mixin.IGpuDeviceMixin;
 import dev.evvie.waylandcraft.render.BufferTexture;
 import dev.evvie.waylandcraft.render.BufferTexture.DmabufImportFailedException;
 import dev.evvie.waylandcraft.render.BufferTexture.DmabufTexture;
@@ -132,8 +134,8 @@ public class WaylandCraftBridge {
 	}
 	
 	private static DmabufFeedbackData initBackend() {
-		GpuDeviceBackend deviceBackend = RenderSystem.getDevice().backend;
-		if(deviceBackend instanceof GlDevice) {
+		GpuDeviceBackend deviceBackend = ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend();
+		if(deviceBackend instanceof IGlDeviceMixin) {
 			return initBackendEGL();
 		}
 		else if(deviceBackend instanceof VulkanDevice) {
@@ -145,6 +147,14 @@ public class WaylandCraftBridge {
 	}
 	
 	private static DmabufFeedbackData initBackendEGL() {
+		if(!EglAvailability.probe()) {
+			// Already logged by EglAvailability.probe(): the window's GL context
+			// wasn't created via EGL on this system, so there's no EGL display to
+			// query dmabuf formats/render node from. Disable dmabuf/EGLImage
+			// integration instead of crashing.
+			return null;
+		}
+
 		long eglDisplay = EGL.getEGLDisplay();
 		if(eglDisplay == 0) {
 			throw new RuntimeException("Failed to get EGL display!");

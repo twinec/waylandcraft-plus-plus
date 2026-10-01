@@ -2,18 +2,16 @@ package dev.evvie.waylandcraft.sharing;
 
 import java.util.Optional;
 import org.joml.Vector4f;
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.PrimitiveTopology;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.TextureTarget;
-import com.mojang.blaze3d.systems.CommandEncoder;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.pipeline.ColorTargetState;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.textures.FilterMode;
 import net.minecraft.client.renderer.BindGroupLayouts;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
@@ -308,16 +306,16 @@ public class SharingOwner {
 		if(window.captureTarget == null || window.captureTarget.width != width || window.captureTarget.height != height) {
 			// Safe to replace: captures for this window wait until its previous readback finished
 			if(window.captureTarget != null) window.captureTarget.destroyBuffers();
-			window.captureTarget = new TextureTarget("waylandcraft window share capture", width, height, false, GpuFormat.RGBA8_UNORM);
+			window.captureTarget = new TextureTarget("waylandcraft window share capture", width, height, GpuFormat.RGBA8_UNORM, null);
 		}
 		TextureTarget target = window.captureTarget;
 
-		GpuDevice device = RenderSystem.getDevice();
-		CommandEncoder commands = device.createCommandEncoder();
+		var device = RenderSystem.getDevice();
+		var commands = device.createCommandEncoder();
 		try(RenderPass pass = commands.createRenderPass(() -> "window share capture", target.getColorTextureView(), Optional.of(new Vector4f(0, 0, 0, 1)))) {
-			pass.setPipeline(CAPTURE_PIPELINE);
+			pass.setPipeline(RenderSystem.getCompiledPipeline(CAPTURE_PIPELINE));
 			RenderSystem.bindDefaultUniforms(pass);
-			pass.bindTexture("InSampler", framebuffer.getTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+			pass.setUniform("InSampler", framebuffer.getTextureView(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
 			pass.draw(3, 1, 0, 0);
 		}
 		long timestamp = System.currentTimeMillis();

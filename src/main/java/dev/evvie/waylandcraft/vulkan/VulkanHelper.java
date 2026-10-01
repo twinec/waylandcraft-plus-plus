@@ -29,12 +29,15 @@ import org.lwjgl.vulkan.VkPhysicalDeviceProperties2;
 import org.lwjgl.vulkan.VkSubresourceLayout;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vulkan.VulkanDevice;
+import com.mojang.renderpearl.backend.vulkan.VulkanCommandEncoder;
+import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 
 import dev.evvie.waylandcraft.WaylandCraftCommon;
 import dev.evvie.waylandcraft.bridge.dmabuf.Dmabuf;
 import dev.evvie.waylandcraft.bridge.dmabuf.DmabufFormat;
 import dev.evvie.waylandcraft.bridge.dmabuf.DmabufPlane;
+import dev.evvie.waylandcraft.mixin.IGpuDeviceMixin;
+import dev.evvie.waylandcraft.mixin.IVulkanCommandEncoderMixin;
 import it.unimi.dsi.fastutil.ints.IntIntImmutablePair;
 
 public class VulkanHelper {
@@ -55,7 +58,7 @@ public class VulkanHelper {
 	public static record DrmNodeId(int major, int minor) {}
 	
 	public static VulkanDevice getVulkanDevice() {
-		return (VulkanDevice) RenderSystem.getDevice().backend;
+		return (VulkanDevice) ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend();
 	}
 	
 	public static DrmNodeId getRenderNodeId(VulkanDevice device) {
@@ -193,7 +196,8 @@ public class VulkanHelper {
 			VkDependencyInfo dependency = VkDependencyInfo.calloc(stack).sType$Default();
 			dependency.pImageMemoryBarriers(barrier);
 			
-			KHRSynchronization2.vkCmdPipelineBarrier2KHR(device.createCommandEncoder().commandBuffer(), dependency);
+			VulkanCommandEncoder commandEncoder = device.createCommandEncoder();
+			KHRSynchronization2.vkCmdPipelineBarrier2KHR(((IVulkanCommandEncoderMixin) commandEncoder).invokeCommandBuffer(), dependency);
 		}
 	}
 	
@@ -219,7 +223,8 @@ public class VulkanHelper {
 			VkDependencyInfo dependency = VkDependencyInfo.calloc(stack).sType$Default();
 			dependency.pImageMemoryBarriers(barrier);
 			
-			KHRSynchronization2.vkCmdPipelineBarrier2KHR(device.createCommandEncoder().commandBuffer(), dependency);
+			VulkanCommandEncoder commandEncoder = device.createCommandEncoder();
+			KHRSynchronization2.vkCmdPipelineBarrier2KHR(((IVulkanCommandEncoderMixin) commandEncoder).invokeCommandBuffer(), dependency);
 		}
 	}
 	

@@ -1,5 +1,7 @@
 package dev.evvie.waylandcraft.render;
 
+import org.joml.Matrix4f;
+
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 
@@ -8,24 +10,28 @@ import dev.evvie.waylandcraft.bridge.WLCToplevel;
 import dev.evvie.waylandcraft.bridge.WaylandCraftBridge.Size;
 import dev.evvie.waylandcraft.mixin.IItemInHandRendererMixin;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.FirstPersonHandsAndItemsRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.state.level.PlayerRenderState;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 
 public class WindowInHandRenderer {
-	
-	public void render(PoseStack poseStack, SubmitNodeCollector collector, float attack, float handHeight, int light, HumanoidArm humanoidArm, ItemStack itemStack) {
+
+	private FirstPersonHandsAndItemsRenderer handRenderer;
+
+	public void render(PoseStack poseStack, SubmitNodeCollector collector, float attack, float handHeight, int light, HumanoidArm humanoidArm, ItemStack itemStack, PlayerRenderState renderState) {
 		poseStack.pushPose();
-		
+
 		float h = humanoidArm == HumanoidArm.RIGHT ? 1.0f : -1.0f;
 		poseStack.translate(h * 0.125f, -0.125f, 0.0f);
-		
+
 		if (!Minecraft.getInstance().player.isInvisible()) {
 			poseStack.pushPose();
-			poseStack.mulPose(Axis.ZP.rotationDegrees(h * 10.0f));
-			renderPlayerArm(poseStack, collector, light, handHeight, attack, humanoidArm);
+			poseStack.mulPose(new Matrix4f().rotation(Axis.ZP.rotationDegrees(h * 10.0f)));
+			renderPlayerArm(poseStack, collector, light, handHeight, attack, humanoidArm, renderState);
 			poseStack.popPose();
 		}
 		
@@ -37,8 +43,8 @@ public class WindowInHandRenderer {
 		float dy = 0.55f * Mth.sin(sattack * (float) (Math.PI * 2));
 		float dz = -0.6f * Mth.sin(attack * (float) Math.PI);
 		poseStack.translate(h * dx, dy - 0.3f * osci, dz);
-		poseStack.mulPose(Axis.XP.rotationDegrees(osci * -45.0f));
-		poseStack.mulPose(Axis.YP.rotationDegrees(h * osci * -30.0f));
+		poseStack.mulPose(new Matrix4f().rotation(Axis.XP.rotationDegrees(osci * -45.0f)));
+		poseStack.mulPose(new Matrix4f().rotation(Axis.YP.rotationDegrees(h * osci * -30.0f)));
 		
 		renderWindow(poseStack, collector, h, light, itemStack);
 		
@@ -94,8 +100,9 @@ public class WindowInHandRenderer {
 		RenderUtils.renderFramebuffer(toplevel.framebuffer, poseStack, collector, false, new Vec3(0, 1, 0), new Vec3(1, 0, 0), new Vec3(0, -1, 0));
 	}
 	
-	public void renderPlayerArm(PoseStack poseStack, SubmitNodeCollector collector, int light, float handHeight, float attack, HumanoidArm humanoidArm) {
-		((IItemInHandRendererMixin) Minecraft.getInstance().getEntityRenderDispatcher().getItemInHandRenderer()).invokeRenderPlayerArm(poseStack, collector, light, handHeight, attack, humanoidArm);
+	public void renderPlayerArm(PoseStack poseStack, SubmitNodeCollector collector, int light, float handHeight, float attack, HumanoidArm humanoidArm, PlayerRenderState renderState) {
+		if(handRenderer == null) handRenderer = new FirstPersonHandsAndItemsRenderer(Minecraft.getInstance());
+		((IItemInHandRendererMixin) handRenderer).invokeRenderPlayerArm(poseStack, collector, light, handHeight, attack, humanoidArm, renderState);
 	}
 	
 }

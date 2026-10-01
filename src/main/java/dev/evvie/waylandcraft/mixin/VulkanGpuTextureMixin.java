@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.mojang.blaze3d.vulkan.VulkanGpuTexture;
+import com.mojang.renderpearl.backend.vulkan.VulkanGpuTexture;
 
 import dev.evvie.waylandcraft.vulkan.VulkanHelper;
 import it.unimi.dsi.fastutil.ints.IntIntImmutablePair;

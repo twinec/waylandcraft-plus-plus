@@ -1,29 +1,28 @@
 package dev.evvie.waylandcraft.mixin;
 
-import java.util.Collection;
+import java.util.HashSet;
 import java.util.Set;
 
-import org.lwjgl.vulkan.VkDevice;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.mojang.blaze3d.vulkan.VulkanBackend;
-import com.mojang.blaze3d.vulkan.VulkanPhysicalDevice;
-import com.mojang.blaze3d.vulkan.init.VulkanFeature;
+import com.mojang.renderpearl.backend.vulkan.VulkanBackend;
+import com.mojang.renderpearl.backend.vulkan.VulkanPhysicalDevice;
+import com.mojang.renderpearl.backend.vulkan.init.FeatureSet;
 
 import dev.evvie.waylandcraft.WaylandCraftCommon;
 import dev.evvie.waylandcraft.vulkan.VulkanHelper;
 
 @Mixin(VulkanBackend.class)
 public class VulkanBackendMixin {
-	
-	@WrapOperation(
-			method = "createDevice(JLcom/mojang/blaze3d/shaders/ShaderSource;Lcom/mojang/blaze3d/shaders/GpuDebugOptions;Ljava/lang/Runnable;)Lcom/mojang/blaze3d/systems/GpuDevice;",
-			at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vulkan/VulkanBackend;createDevice(Ljava/util/Collection;Lcom/mojang/blaze3d/vulkan/VulkanPhysicalDevice;Ljava/util/Set;)Lorg/lwjgl/vulkan/VkDevice;")
+
+	@ModifyVariable(
+			method = "createDevice(Lcom/mojang/renderpearl/backend/vulkan/init/FeatureSet;Lcom/mojang/renderpearl/backend/vulkan/VulkanPhysicalDevice;)Lorg/lwjgl/vulkan/VkDevice;",
+			at = @At("HEAD"),
+			argsOnly = true
 	)
-	private VkDevice checkMoreVulkanExtensions(Collection<String> deviceExtensions, VulkanPhysicalDevice physicalDevice, Set<VulkanFeature> features, Operation<VkDevice> original) {
+	private static FeatureSet checkMoreVulkanExtensions(FeatureSet featureSet, FeatureSet originalFeatureSet, VulkanPhysicalDevice physicalDevice) {
 		boolean hasNecessaryExtensions = true;
 		for(String extension : VulkanHelper.NECESSARY_VULKAN_EXTENSIONS) {
 			if(!physicalDevice.hasDeviceExtension(extension)) {
@@ -32,15 +31,17 @@ public class VulkanBackendMixin {
 				break;
 			}
 		}
-		
-		if(hasNecessaryExtensions) {
-			for(String extension : VulkanHelper.NECESSARY_VULKAN_EXTENSIONS) {
-				deviceExtensions.add(extension);
-				System.out.println("ADDED EXTENSION " + extension);
-			}
+
+		if(!hasNecessaryExtensions) return featureSet;
+
+		Set<String> extraExtensions = new HashSet<>();
+		for(String extension : VulkanHelper.NECESSARY_VULKAN_EXTENSIONS) {
+			extraExtensions.add(extension);
+			System.out.println("ADDED EXTENSION " + extension);
 		}
-		
-		return original.call(deviceExtensions, physicalDevice, features);
+
+		FeatureSet dmabufFeatures = new FeatureSet("waylandcraft_dmabuf", extraExtensions, Set.of());
+		return featureSet.composite(dmabufFeatures);
 	}
-	
+
 }

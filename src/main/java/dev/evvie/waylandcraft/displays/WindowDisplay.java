@@ -1,7 +1,6 @@
 package dev.evvie.waylandcraft.displays;
 
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -144,8 +143,8 @@ public class WindowDisplay extends AbstractWindowDisplay {
 	public void doGrabMove(Vec3 pos, Vec3 view, Vec3 up, float yRot) {
 		this.anchorToPosView(pos, view, up);
 		
-		boolean modDown = InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), GLFW.GLFW_KEY_LEFT_ALT);
-		boolean ctrlDown = InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL);
+		boolean modDown = InputConstants.isKeyDown(InputConstants.KEY_LALT);
+		boolean ctrlDown = InputConstants.isKeyDown(InputConstants.KEY_LCONTROL);
 		if(modDown) {
 			this.tryAttachWalls(pos, view, yRot, ctrlDown);
 		}

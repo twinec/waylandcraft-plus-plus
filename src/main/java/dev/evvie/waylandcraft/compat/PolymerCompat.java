@@ -4,6 +4,8 @@ import eu.pb4.polymer.common.api.PolymerCommonUtils;
 import eu.pb4.polymer.core.api.item.PolymerItem;
 import eu.pb4.polymer.core.api.utils.PolymerClientDecoded;
 import eu.pb4.polymer.core.api.utils.PolymerSyncedObject;
+import net.fabricmc.fabric.api.event.registry.RegistryAttribute;
+import net.fabricmc.fabric.api.event.registry.RegistryAttributeHolder;
 import net.fabricmc.fabric.api.networking.v1.context.PacketContext;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.HolderLookup;
@@ -22,13 +24,10 @@ import dev.evvie.waylandcraft.network.WaylandCraftPresence;
 
 /**
  * Registers WaylandCraft's items as Polymer overlays, using
- * {@link PolymerItem#registerOverlay} rather than implementing PolymerItem
- * directly on the item classes -- this keeps WindowItem free of any
- * compile-time or class-load-time dependency on Polymer, so the mod works
- * fine with Polymer absent.
- *
- * This class itself must never be referenced unless polymer-core is
- * confirmed loaded -- see the call site in WaylandCraftCommon.
+ * {@link PolymerSyncedObject#setPlainSyncedObject} rather than implementing
+ * PolymerItem directly on the item classes -- this keeps WindowItem itself
+ * free of any compile-time dependency on Polymer, even though polymer-core
+ * is a hard dependency of the mod as a whole (see fabric.mod.json).
  */
 public class PolymerCompat {
 
@@ -43,6 +42,13 @@ public class PolymerCompat {
 	private static final Identifier FALLBACK_MODEL = Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "window_icon");
 
 	public static void register() {
+		// Covers a genuinely-vanilla client (no Fabric API at all): that
+		// case is never reached by RegistrySyncManagerMixin's per-connection
+		// exemption below (fabric-registry-sync-v0 only consults
+		// RegistryAttribute.OPTIONAL when the client can't speak its payload
+		// at all), so it still needs to be marked separately.
+		RegistryAttributeHolder.get(BuiltInRegistries.ITEM).addAttribute(RegistryAttribute.OPTIONAL);
+
 		// Makes our own textures/models (including FALLBACK_MODEL above)
 		// available in Polymer's generated resource pack, so non-modded
 		// clients actually have something to render for the fallback model
@@ -51,26 +57,39 @@ public class PolymerCompat {
 			ResourcePackHook.addAssets();
 		}
 
-		// Not PolymerItem.registerOverlay(...) -- that also calls
-		// RegistrySyncUtils.setServerEntry(), which moves WINDOW to the tail
-		// of the server's item registry at freeze time. That reorder is only
-		// ever communicated to clients over Polymer's own networking
-		// handshake, which real WaylandCraft clients don't speak (we use our
-		// own CONFIGURATION-phase handshake, see WaylandCraftPresence) --
-		// so a real client sent the true item id has no matching entry in
-		// its own registry, decode throws "No value with id N". Registering
-		// only the plain synced-object overlay keeps the disguise-on-encode
-		// behavior (that's independent of setServerEntry) without moving
-		// WINDOW's id, so ordinary fabric-registry-sync-v0 keeps informing
-		// every client of its real, unmoved id like any other modded item.
-		// See project memory: container-set-content-decode-crash.
+		// PolymerSyncedObject.setPlainSyncedObject(...), not
+		// PolymerItem.registerOverlay(...) -- registerOverlay also calls
+		// RegistrySyncUtils.setServerEntry(), which (via Polymer's own
+		// registry-sync-manipulator mixin) moves WINDOW to the tail of the
+		// item registry's raw ids at freeze time, independently on client
+		// and server. That only produces a matching raw id on both sides
+		// when client and server register the exact same set of "server
+		// entry" items in the exact same relative order -- never guaranteed
+		// for a real WaylandCraft client with a different mod set than the
+		// server (e.g. one that also has Trinkets, whose own Polymer compat
+		// registers server entries too). A mismatch there breaks decoding
+		// of *any* vanilla packet carrying a WINDOW ItemStack by raw id
+		// (container_set_slot, Polymer's own sync/items broadcast, etc.)
+		// for real clients -- see project memory:
+		// polymer-registry-sync-optional-fix.
+		//
+		// setPlainSyncedObject keeps the disguise-for-other-clients behavior
+		// (getPolymerItem/getPolymerItemModel below) without moving WINDOW's
+		// raw id at all, so it goes through fabric-registry-sync-v0's normal,
+		// safe remap mechanism like any other modded item -- correct for any
+		// real client regardless of its other mods. The resulting "vanilla
+		// clients kicked as missing the mod" problem (WINDOW now being a
+		// required entry again) is instead solved per-connection, by
+		// RegistrySyncManagerMixin filtering WINDOW out of the handshake
+		// specifically for connections that aren't real WaylandCraft
+		// clients, rather than excluding it from sync for everyone.
 		PolymerSyncedObject.setPlainSyncedObject(BuiltInRegistries.ITEM, WindowItem.WINDOW, new WindowItemPolymerOverlay());
 	}
 
 	// Isolated in its own class so merely loading PolymerCompat doesn't
-	// force-load PolymerResourcePackUtils (from the separate
-	// polymer-resource-pack module) -- see the isModLoaded guard at the
-	// call site in WaylandCraftCommon for why this pattern matters.
+	// force-load PolymerResourcePackUtils (from the separate, still-optional
+	// polymer-resource-pack module) -- unlike polymer-core, nothing requires
+	// that submodule to be present.
 	private static class ResourcePackHook {
 
 		private static void addAssets() {
