@@ -74,6 +74,50 @@ processResources {
 	}
 }
 
+// TEMPORARY diagnostic task -- dumps Polymer's item-sync payload classes
+// to investigate a live "Failed to decode packet ... (polymer:sync/items)"
+// crash reported after making polymer-core a hard dependency.
+tasks.register("diagPolymerSync") {
+	doLast {
+		def classNames = [
+			"eu.pb4.polymer.core.impl.networking.payloads.PayloadUtil",
+			"eu.pb4.polymer.core.impl.networking.payloads.PolymerGenericListPayload",
+			"eu.pb4.polymer.core.impl.networking.payloads.s2c.PolymerSyncStartedS2CPayload",
+			"eu.pb4.polymer.core.impl.networking.payloads.s2c.PolymerSyncFinishedS2CPayload",
+			"eu.pb4.polymer.core.impl.networking.payloads.s2c.PolymerSyncClearS2CPayload",
+			"eu.pb4.polymer.core.impl.CommonImpl",
+		]
+		def jars = sourceSets.main.compileClasspath.files + sourceSets.main.runtimeClasspath.files
+		def tmp = File.createTempDir()
+		for(name in classNames) {
+			def path = name.replace('.', '/') + '.class'
+			def found = false
+			for(jarFile in jars) {
+				if(!jarFile.name.endsWith(".jar")) continue
+				new java.util.zip.ZipFile(jarFile).withCloseable { zf ->
+					def entry = zf.getEntry(path)
+					if(entry != null) {
+						found = true
+						def outFile = new File(tmp, path)
+						outFile.parentFile.mkdirs()
+						outFile.bytes = zf.getInputStream(entry).bytes
+					}
+				}
+			}
+			if(!found) {
+				println "DIAGSYNC_NOTFOUND: ${name}"
+				continue
+			}
+			println "DIAGSYNC_BEGIN: ${name}"
+			def proc = ["javap", "-p", "-c", "-constants", "-classpath", tmp.toString(), name].execute()
+			proc.waitFor()
+			println proc.in.text
+			println proc.err.text
+			println "DIAGSYNC_END: ${name}"
+		}
+	}
+}
+
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = 25
 }
