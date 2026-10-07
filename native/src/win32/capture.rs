@@ -5,6 +5,7 @@
 // capture border from Windows 11 (and Windows 10 build 20348) on, so on older systems
 // PrintWindow is used instead, which never draws a border.
 
+use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use ::windows::Foundation::Metadata::ApiInformation;
@@ -35,7 +36,9 @@ use ::windows::Win32::Graphics::Gdi::{
     DIB_RGB_COLORS, DeleteDC, DeleteObject, GdiFlush, GetDC, HBITMAP, HDC,
     HGDIOBJ, ReleaseDC, SelectObject,
 };
+use ::windows::Security::Authorization::AppCapabilityAccess::AppCapabilityAccessStatus;
 use ::windows::Win32::Storage::Xps::{PRINT_WINDOW_FLAGS, PrintWindow};
+use ::windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx};
 use ::windows::Win32::System::WinRT::Direct3D11::{
     CreateDirect3D11DeviceFromDXGIDevice, IDirect3DDxgiInterfaceAccess,
 };
@@ -49,6 +52,8 @@ const PW_RENDERFULLCONTENT: PRINT_WINDOW_FLAGS = PRINT_WINDOW_FLAGS(2);
 
 // PrintWindow is slow for large windows, so it runs at most this often per window
 const PRINT_WINDOW_INTERVAL: Duration = Duration::from_millis(33);
+
+const BORDERLESS_REQUEST_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// A captured frame: tightly packed BGRA rows, top row first.
 pub struct Frame {
@@ -154,15 +159,32 @@ pub fn choose_method() -> CaptureMethod {
         return CaptureMethod::PrintWindow;
     }
 
-    // Unpackaged apps are normally allowed borderless capture, but ask like OBS does
-    let allowed =
-        GraphicsCaptureAccess::RequestAccessAsync(GraphicsCaptureAccessKind::Borderless)
-            .and_then(|op| op.join())
-            .map(|status| {
-                status
-                    == ::windows::Security::Authorization::AppCapabilityAccess::AppCapabilityAccessStatus::Allowed
-            })
-            .unwrap_or(false);
+    // Unpackaged apps are normally allowed borderless capture, but ask like OBS does.
+    // The request completes on another apartment, so waiting for it on the render
+    // thread (single-threaded COM, no message loop) would deadlock: ask from a
+    // multithreaded helper thread instead, and give up after a few seconds.
+    let (sender, receiver) = mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
+        let allowed = GraphicsCaptureAccess::RequestAccessAsync(
+            GraphicsCaptureAccessKind::Borderless,
+        )
+        .and_then(|op| op.join())
+        .map(|status| status == AppCapabilityAccessStatus::Allowed);
+        let _ = sender.send(allowed);
+    });
+    let allowed = match receiver.recv_timeout(BORDERLESS_REQUEST_TIMEOUT) {
+        Ok(Ok(allowed)) => allowed,
+        Ok(Err(e)) => {
+            eprintln!("[waylandcraft] Borderless capture request failed: {e}");
+            false
+        }
+        // No answer: try WGC anyway; at worst the border shows
+        Err(_) => {
+            eprintln!("[waylandcraft] Borderless capture request timed out");
+            true
+        }
+    };
 
     if allowed {
         CaptureMethod::Wgc
