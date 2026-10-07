@@ -115,6 +115,21 @@ jar {
 		"linux-gnu-arm64"
 	];
 
+	// Windows libraries are cross-compiled with mingw (see the workflows)
+	def windowsTargets = [
+		"windows-x86_64"
+	];
+
+	for(def target in windowsTargets) {
+		def f = file("native-libs/waylandcraft-${target}.dll")
+		if(!f.exists()) continue;
+
+		with(copySpec {
+			from(f)
+		})
+		natives.add("${target}")
+	}
+
 	for(def target in targets) {
 		def f = file("native-libs/libwaylandcraft-${target}.so")
 		if(!f.exists()) continue;
