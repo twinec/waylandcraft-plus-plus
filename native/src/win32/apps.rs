@@ -3,6 +3,10 @@
 // Like Open-Shell, apps are read from the shell's AppsFolder (the list behind Start's
 // "All apps"), which covers both desktop apps and Store apps. Each app's parsing name is
 // its launch ID: an AppUserModelID for Store apps, a path or ID for desktop apps.
+//
+// Reading the AppsFolder and extracting icons can take many seconds, so the list and
+// the icons (as PNGs) are cached in %LOCALAPPDATA%\WaylandCraft. The cached list is
+// shown right away and refreshed in the background for the next start.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -26,7 +30,7 @@ use ::windows::Win32::UI::Shell::{
     SIGDN, SIGDN_NORMALDISPLAY, SIGDN_PARENTRELATIVEPARSING, SIIGBF_ICONONLY,
     ShellExecuteExW,
 };
-use ::windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+use ::windows::Win32::UI::WindowsAndMessaging::SW_SHOWNOACTIVATE;
 use ::windows::core::{HSTRING, Interface, PCWSTR, Result};
 
 const ICON_SIZE: i32 = 64;
@@ -49,16 +53,75 @@ fn init_com() {
 }
 
 pub fn load_apps() -> Vec<AppEntry> {
-    // Called on a background thread of its own, which has no message loop, so
-    // single-threaded COM could deadlock there
+    if let Some(apps) = read_cache() {
+        std::thread::spawn(refresh_apps);
+        return apps;
+    }
+    refresh_apps()
+}
+
+// Reads the AppsFolder and updates the cache
+fn refresh_apps() -> Vec<AppEntry> {
+    // Runs on a background thread with no message loop, so single-threaded COM could
+    // deadlock there
     let _ = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
     match enumerate_apps_folder() {
-        Ok(apps) => apps,
+        Ok(apps) => {
+            write_cache(&apps);
+            apps
+        }
         Err(e) => {
             eprintln!("[waylandcraft] Failed to read the AppsFolder: {e}");
             vec![]
         }
     }
+}
+
+fn cache_dir() -> PathBuf {
+    std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("WaylandCraft")
+}
+
+// The list is one app per line: ID, name and icon path, separated by tabs
+fn read_cache() -> Option<Vec<AppEntry>> {
+    let text = std::fs::read_to_string(cache_dir().join("apps.tsv")).ok()?;
+    let apps: Vec<AppEntry> = text
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.split('\t');
+            let app_id = fields.next()?.to_string();
+            let name = fields.next()?.to_string();
+            let icon_path = fields
+                .next()
+                .filter(|path| !path.is_empty() && Path::new(path).exists())
+                .map(String::from);
+            Some(AppEntry { app_id, name, icon_path })
+        })
+        .collect();
+    if apps.is_empty() { None } else { Some(apps) }
+}
+
+fn write_cache(apps: &[AppEntry]) {
+    let clean = |s: &str| s.replace(['\t', '\r', '\n'], " ");
+    let mut text = String::new();
+    for app in apps {
+        text.push_str(&clean(&app.app_id));
+        text.push('\t');
+        text.push_str(&clean(&app.name));
+        text.push('\t');
+        text.push_str(app.icon_path.as_deref().unwrap_or(""));
+        text.push('\n');
+    }
+    let _ = write_atomic(&cache_dir().join("apps.tsv"), text.as_bytes());
+}
+
+// Writes through a temporary file, so a reader never sees a half-written file
+fn write_atomic(path: &Path, data: &[u8]) -> std::io::Result<()> {
+    let temp = path.with_extension("tmp");
+    std::fs::write(&temp, data)?;
+    std::fs::rename(&temp, path)
 }
 
 fn enumerate_apps_folder() -> Result<Vec<AppEntry>> {
@@ -112,7 +175,7 @@ fn display_name(item: &IShellItem, sigdn: SIGDN) -> Option<String> {
 }
 
 fn icon_dir() -> Option<PathBuf> {
-    let dir = std::env::temp_dir().join("waylandcraft-icons");
+    let dir = cache_dir().join("icons");
     std::fs::create_dir_all(&dir).ok()?;
     Some(dir)
 }
@@ -135,7 +198,7 @@ fn save_icon(item: &IShellItem, dir: &Path, app_id: &str) -> Option<String> {
     }
     let (rgba, width, height) = pixels?;
 
-    std::fs::write(&path, encode_png(&rgba, width, height)).ok()?;
+    write_atomic(&path, &encode_png(&rgba, width, height)).ok()?;
     path.to_str().map(String::from)
 }
 
@@ -290,7 +353,8 @@ pub fn launch(app_id: &str) -> Option<Launched> {
         fMask: SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI,
         lpVerb: PCWSTR(verb.as_ptr()),
         lpFile: PCWSTR(target.as_ptr()),
-        nShow: SW_SHOWNORMAL.0,
+        // Most apps honor this for their first window, so the game keeps the focus
+        nShow: SW_SHOWNOACTIVATE.0,
         ..Default::default()
     };
     if unsafe { ShellExecuteExW(&mut info) }.is_err() {

@@ -5,6 +5,11 @@
 // whose process Windows doesn't report. WAYLANDCRAFT_WINDOWS=all shows every window.
 // Owned popups without a title bar (menus, dropdowns, tooltips) become popups of
 // their owner, the rest become toplevels.
+//
+// Windows has no way to make an app draw only into the game, so the real windows of
+// launched apps are moved past the edge of the desktop, where they keep rendering and
+// being captured, and the game window gets the focus back. They return to where they
+// were when the game exits. WAYLANDCRAFT_HIDE_WINDOWS=0 leaves them on the desktop.
 
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
@@ -23,10 +28,12 @@ use ::windows::Win32::System::Threading::{
 };
 use ::windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GW_OWNER, GWL_EXSTYLE, GWL_STYLE, GetClassNameW, GetClientRect,
-    GetWindow, GetWindowLongW, GetWindowRect, GetWindowTextW,
-    GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, SWP_NOACTIVATE,
-    SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOZORDER, SetWindowPos, WS_CAPTION,
-    WS_EX_TOOLWINDOW, WS_POPUP,
+    GetForegroundWindow, GetSystemMetrics, GetWindow, GetWindowLongW, GetWindowRect,
+    GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible,
+    IsZoomed, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+    SM_YVIRTUALSCREEN, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOMOVE,
+    SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SetForegroundWindow, SetWindowPos,
+    ShowWindow, WS_CAPTION, WS_EX_TOOLWINDOW, WS_POPUP,
 };
 use ::windows::core::{BOOL, PWSTR};
 
@@ -130,6 +137,12 @@ pub struct Instance {
     /// Windows that existed when an app without a known process was launched
     pending_launch: Option<(Instant, HashSet<isize>)>,
     last_process_scan: Option<Instant>,
+    /// Whether the real windows of launched apps are moved off the desktop
+    hide_windows: bool,
+    /// Where each hidden window was before it was moved, to put it back on exit
+    hidden: HashMap<isize, POINT>,
+    /// The game's own window, which gets the focus back from launched apps
+    game_window: Option<HWND>,
     pub input: InputState,
     pub pointer_focus: Option<HWND>,
     pub keyboard_focus: Option<HWND>,
@@ -159,16 +172,23 @@ impl Instance {
         let method = if d3d.is_some() { method } else { CaptureMethod::PrintWindow };
         eprintln!("[waylandcraft] Capturing windows with {method:?}");
 
+        let capture_all = std::env::var("WAYLANDCRAFT_WINDOWS").as_deref() == Ok("all");
+        let hide_windows =
+            !capture_all && std::env::var("WAYLANDCRAFT_HIDE_WINDOWS").as_deref() != Ok("0");
+
         Instance {
             method,
             d3d,
             windows: vec![],
             own_pid: unsafe { GetCurrentProcessId() },
-            capture_all: std::env::var("WAYLANDCRAFT_WINDOWS").as_deref() == Ok("all"),
+            capture_all,
             tracked_pids: HashSet::new(),
             adopted: HashSet::new(),
             pending_launch: None,
             last_process_scan: None,
+            hide_windows,
+            hidden: HashMap::new(),
+            game_window: None,
             input: InputState::default(),
             pointer_focus: None,
             keyboard_focus: None,
@@ -242,6 +262,9 @@ impl Instance {
         // Toplevels first, so popups can find their parents
         for &hwnd in &all {
             let Some(info) = WindowInfo::read(hwnd) else { continue };
+            if info.pid == self.own_pid && self.game_window.is_none() && !info.is_popup() {
+                self.game_window = Some(hwnd);
+            }
             if info.pid == self.own_pid || info.is_popup() || info.tool {
                 continue;
             }
@@ -308,6 +331,7 @@ impl Instance {
             {
                 window.alive = false;
                 window.frame = None;
+                self.hidden.remove(&(window.hwnd.0 as isize));
             }
         }
 
@@ -330,6 +354,10 @@ impl Instance {
                 geometry: [0, 0, 0, 0],
                 popup_offset: [0, 0],
             }));
+        }
+
+        if self.hide_windows {
+            self.hide_toplevels();
         }
 
         for window in &mut self.windows {
@@ -360,6 +388,55 @@ impl Instance {
         self.update_popup_offsets();
     }
 
+    // Moves launched apps' windows past the edge of the desktop. Apps that move their
+    // window back (restoring a saved position, say) are moved away again.
+    fn hide_toplevels(&mut self) {
+        let screen = virtual_screen();
+        let mut stole_focus = false;
+        for window in &self.windows {
+            if !window.alive || window.kind != Kind::Toplevel {
+                continue;
+            }
+            let hwnd = window.hwnd;
+            if unsafe { IsIconic(hwnd) }.as_bool() {
+                continue;
+            }
+            let mut rect = RECT::default();
+            if unsafe { GetWindowRect(hwnd, &mut rect) }.is_err()
+                || !intersects(&rect, &screen)
+            {
+                continue;
+            }
+
+            self.hidden
+                .entry(hwnd.0 as isize)
+                .or_insert(POINT { x: rect.left, y: rect.top });
+            // A maximized window can't be moved; restore it to its normal size first
+            if unsafe { IsZoomed(hwnd) }.as_bool() {
+                let _ = unsafe { ShowWindow(hwnd, SW_SHOWNOACTIVATE) };
+            }
+            let _ = unsafe {
+                SetWindowPos(
+                    hwnd,
+                    None,
+                    screen.right + 64,
+                    screen.top,
+                    0,
+                    0,
+                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE,
+                )
+            };
+            if unsafe { GetForegroundWindow() } == hwnd {
+                stole_focus = true;
+            }
+        }
+
+        // The game process had the last input, so Windows lets it take the focus back
+        if stole_focus && let Some(game) = self.game_window {
+            let _ = unsafe { SetForegroundWindow(game) };
+        }
+    }
+
     // Popup positions relative to their parent's window geometry
     fn update_popup_offsets(&mut self) {
         let origins: Vec<(HWND, POINT)> = self
@@ -376,6 +453,45 @@ impl Instance {
             }
         }
     }
+}
+
+impl Drop for Instance {
+    fn drop(&mut self) {
+        for (&hwnd, position) in &self.hidden {
+            let hwnd = HWND(hwnd as *mut _);
+            if !unsafe { IsWindow(Some(hwnd)) }.as_bool() {
+                continue;
+            }
+            let _ = unsafe {
+                SetWindowPos(
+                    hwnd,
+                    None,
+                    position.x,
+                    position.y,
+                    0,
+                    0,
+                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE,
+                )
+            };
+        }
+    }
+}
+
+fn virtual_screen() -> RECT {
+    unsafe {
+        let left = GetSystemMetrics(SM_XVIRTUALSCREEN);
+        let top = GetSystemMetrics(SM_YVIRTUALSCREEN);
+        RECT {
+            left,
+            top,
+            right: left + GetSystemMetrics(SM_CXVIRTUALSCREEN),
+            bottom: top + GetSystemMetrics(SM_CYVIRTUALSCREEN),
+        }
+    }
+}
+
+fn intersects(a: &RECT, b: &RECT) -> bool {
+    a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
 }
 
 struct WindowInfo {

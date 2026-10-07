@@ -50,7 +50,11 @@ windows and forwards keyboard and mouse input to them, while Minecraft keeps foc
 - Windows 11 captures with Windows.Graphics.Capture without the yellow capture border. Older Windows 10 versions
   can't hide that border, so they use PrintWindow instead, which is slower but borderless.
   `WAYLANDCRAFT_CAPTURE=wgc` or `WAYLANDCRAFT_CAPTURE=printwindow` forces one method.
-- Captured apps stay open on your desktop behind the game. Minimized apps keep showing their last frame.
+- Apps open without taking focus from the game, and their real windows are moved just past the edge of your
+  desktop, where they keep running. They move back when the game closes. Set `WAYLANDCRAFT_HIDE_WINDOWS=0` to keep
+  them on the desktop. Minimized apps keep showing their last frame.
+- The app list and icons are cached in `%LOCALAPPDATA%\WaylandCraft`, so the launcher fills instantly after the first
+  start. Apps installed since the last start show up the start after.
 - Known limits: keyboard shortcuts that rely on held modifiers (like Ctrl+S) may not reach every app, there is no
   relative mouse mode for 3D games yet, and sharing a window's audio is Linux-only for now.
 
