@@ -13,7 +13,7 @@ Coming soon to a [Modrinth](https://modrinth.com/mod/waylandcraft_plus_plus) nea
 > written with major help from an LLM (Claude Code).
 
 ## System dependencies
-- OS: Linux
+- OS: Linux, or Windows 10 1903+ (experimental, see below)
 - Minecraft 26.3
 - Fabric mod loader
 - xkbcommon library 1.11.0
@@ -40,6 +40,19 @@ the windows, `B` opens the window manager screen.
 ### How can I press Escape in the windows?
 Instead of using `G` to capture the keyboard, use `ALT+Q` instead. The only way to turn it off is to press `ALT-Q` again,
 so the `ESC` key is forwarded to the application.
+
+### Does it work on Windows? (experimental)
+Yes, on Windows 10 1903 or newer (x86_64). Instead of running a Wayland compositor, the mod captures real desktop
+windows and forwards keyboard and mouse input to them, while Minecraft keeps focus.
+- The app launcher (`V`) lists the same apps as Start's "All apps", including Store apps. Windows of apps you start
+  from it appear in the game; other desktop windows don't. Set the environment variable `WAYLANDCRAFT_WINDOWS=all`
+  to show every window instead.
+- Windows 11 captures with Windows.Graphics.Capture without the yellow capture border. Older Windows 10 versions
+  can't hide that border, so they use PrintWindow instead, which is slower but borderless.
+  `WAYLANDCRAFT_CAPTURE=wgc` or `WAYLANDCRAFT_CAPTURE=printwindow` forces one method.
+- Captured apps stay open on your desktop behind the game. Minimized apps keep showing their last frame.
+- Known limits: keyboard shortcuts that rely on held modifiers (like Ctrl+S) may not reach every app, there is no
+  relative mouse mode for 3D games yet, and sharing a window's audio is Linux-only for now.
 
 ### How do I run X11 apps?
 Since v2.0.0 waylandcraft has integrated support for [xwayland-satellite](https://github.com/Supreeeme/xwayland-satellite).

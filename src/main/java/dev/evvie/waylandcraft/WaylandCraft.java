@@ -159,7 +159,8 @@ public class WaylandCraft implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register((minecraft) -> sharingViewer.tick());
 		ClientPlayConnectionEvents.DISCONNECT.register((listener, minecraft) -> sharingViewer.reset());
 		
-		if(Platform.get() != Platform.LINUX) {
+		// Linux runs a Wayland compositor, Windows captures desktop windows (native/src/win32)
+		if(Platform.get() != Platform.LINUX && Platform.get() != Platform.WINDOWS) {
 			WaylandCraftCommon.LOGGER.error("Invalid platform detected! Most mod features will be disabled");
 			WaylandCraft.fallbackMode = true;
 			return;
@@ -191,11 +192,16 @@ public class WaylandCraft implements ClientModInitializer {
 			x11Display = bridge.getX11Display();
 			xdgManager = new XDGDesktopManager(this);
 			registerSettingsResponders();
-			settingsManager.loadKeymap();
-			settingsManager.loadEnvOverrides();
+			if(Platform.get() == Platform.LINUX) {
+				settingsManager.loadKeymap();
+				settingsManager.loadEnvOverrides();
 
-			WaylandCraftCommon.LOGGER.info("Wayland server started on " + waylandSocket);
-			WaylandCraftCommon.LOGGER.info("Xwayland started on " + x11Display);
+				WaylandCraftCommon.LOGGER.info("Wayland server started on " + waylandSocket);
+				WaylandCraftCommon.LOGGER.info("Xwayland started on " + x11Display);
+			}
+			else {
+				WaylandCraftCommon.LOGGER.info("Started " + waylandSocket);
+			}
 		}
 		bridge.update();
 		sharingOwner.captureFrames();
@@ -326,7 +332,8 @@ public class WaylandCraft implements ClientModInitializer {
 	}
 	
 	private void onClientJoin(ClientPacketListener listener, PacketSender sender, Minecraft minecraft) {
-		minecraft.gui.chatListener().handleSystemMessage(Component.literal("Wayland compositor running on " + waylandSocket), false);
+		String backend = Platform.get() == Platform.LINUX ? "Wayland compositor running on " + waylandSocket : waylandSocket + " running";
+		minecraft.gui.chatListener().handleSystemMessage(Component.literal(backend), false);
 		if(x11Display != null) minecraft.gui.chatListener().handleSystemMessage(Component.literal("xwayland-satellite running on " + x11Display), false);
 		itemManager.giveItemsIfMissing(bridge.getMappedToplevels());
 	}
