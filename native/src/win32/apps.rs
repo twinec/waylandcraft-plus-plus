@@ -13,7 +13,8 @@ use ::windows::Win32::Graphics::Gdi::{
     GetDC, GetDIBits, GetObjectW, HBITMAP, ReleaseDC,
 };
 use ::windows::Win32::System::Com::{
-    CLSCTX_LOCAL_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance,
+    CLSCTX_LOCAL_SERVER, COINIT_APARTMENTTHREADED, COINIT_MULTITHREADED,
+    CoCreateInstance,
     CoInitializeEx, CoTaskMemFree,
 };
 use ::windows::Win32::System::Threading::GetProcessId;
@@ -48,7 +49,9 @@ fn init_com() {
 }
 
 pub fn load_apps() -> Vec<AppEntry> {
-    init_com();
+    // Called on a background thread of its own, which has no message loop, so
+    // single-threaded COM could deadlock there
+    let _ = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
     match enumerate_apps_folder() {
         Ok(apps) => apps,
         Err(e) => {
