@@ -703,6 +703,9 @@ fn keyboard_focus<'local>(_env: &mut Env<'local>, _class: JClass<'local>, instan
     let focus = instance.find(handle).filter(|w| w.alive).map(|w| w.hwnd);
     if focus != instance.keyboard_focus {
         instance.keyboard_focus = focus;
+        if let Some(hwnd) = focus {
+            input::activate(hwnd);
+        }
     }
     Ok(())
 }
