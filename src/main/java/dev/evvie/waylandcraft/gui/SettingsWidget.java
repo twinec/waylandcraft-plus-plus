@@ -359,7 +359,7 @@ public class SettingsWidget extends AbstractWidget {
 
 		public TextControlElement(WaylandCraft wlc, String settingName) {
 			super(wlc, settingName);
-
+			editBox.setMaxLength(4096);
 			editBox = new EditBox(Minecraft.getInstance().font, getWidth(), getHeight(), Component.literal(settingName));
 			editBox.insertText(getSavedValue());
 			editBox.moveCursorTo(0, false);
