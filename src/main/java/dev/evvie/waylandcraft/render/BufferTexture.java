@@ -172,7 +172,13 @@ public abstract class BufferTexture {
 		}
 		
 		private void init() {
-			GlStateManager._bindTexture(this.id);
+			// Bind directly: the texture name is often one that was just deleted and reused,
+			// which GlStateManager's binding cache would wrongly treat as already bound. The
+			// previous bindings are restored afterwards, so the cache stays correct.
+			int previousTexture = GL33.glGetInteger(GL33.GL_TEXTURE_BINDING_2D);
+			int previousUnpackBuffer = GL33.glGetInteger(GL33.GL_PIXEL_UNPACK_BUFFER_BINDING);
+			GL33.glBindBuffer(GL33.GL_PIXEL_UNPACK_BUFFER, 0);
+			GL33.glBindTexture(GL33.GL_TEXTURE_2D, this.id);
 			GlStateManager._texParameter(GL33.GL_TEXTURE_2D, GL33.GL_TEXTURE_MAX_LEVEL, 0);
 			GlStateManager._texParameter(GL33.GL_TEXTURE_2D, GL33.GL_TEXTURE_MIN_LOD, 0);
 			GlStateManager._texParameter(GL33.GL_TEXTURE_2D, GL33.GL_TEXTURE_MAX_LOD, 0);
@@ -186,6 +192,9 @@ public abstract class BufferTexture {
 			GlStateManager._pixelStore(GL33.GL_UNPACK_ALIGNMENT, 4);
 			
 			GL33.nglTexImage2D(GL33.GL_TEXTURE_2D, 0, GL33.GL_RGBA8, width, height, 0, GL33.GL_BGRA, GL33.GL_UNSIGNED_INT_8_8_8_8_REV, this.ptr);
+			
+			GL33.glBindTexture(GL33.GL_TEXTURE_2D, previousTexture);
+			GL33.glBindBuffer(GL33.GL_PIXEL_UNPACK_BUFFER, previousUnpackBuffer);
 		}
 		
 	}

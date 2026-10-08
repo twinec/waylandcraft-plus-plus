@@ -66,7 +66,8 @@ public class WaylandCraftBridge {
 				byte[] data = inputStream.readAllBytes();
 				inputStream.close();
 				
-				File temp = File.createTempFile("waylandcraft-", "-libwaylandcraft.so");
+				String suffix = Platform.get() == Platform.WINDOWS ? "-waylandcraft.dll" : "-libwaylandcraft.so";
+				File temp = File.createTempFile("waylandcraft-", suffix);
 				temp.deleteOnExit();
 				
 				FileOutputStream outputStream = new FileOutputStream(temp);
@@ -95,9 +96,10 @@ public class WaylandCraftBridge {
 	
 	private static InputStream openNativeLibraryFromJar() {
 		InputStream stream = null;
+		boolean windows = Platform.get() == Platform.WINDOWS;
 		
 		/* Attempt to load manually built native library */
-		stream = loadResource("/libwaylandcraft.so");
+		stream = loadResource(windows ? "/waylandcraft.dll" : "/libwaylandcraft.so");
 		if(stream != null) return stream;
 		
 		/* Attempt to load from release library path */
@@ -109,8 +111,12 @@ public class WaylandCraftBridge {
 		}
 		
 		if(arch != null) {
-			String platform = "linux-gnu-" + arch;
-			stream = loadResource("/libwaylandcraft-" + platform + ".so");
+			if(windows) {
+				stream = loadResource("/waylandcraft-windows-" + arch + ".dll");
+			}
+			else {
+				stream = loadResource("/libwaylandcraft-linux-gnu-" + arch + ".so");
+			}
 			if(stream != null) return stream;
 		}
 		
@@ -134,6 +140,9 @@ public class WaylandCraftBridge {
 	}
 	
 	private static DmabufFeedbackData initBackend() {
+		// Dmabufs only exist on Linux; on Windows captured frames arrive as shared memory
+		if(Platform.get() != Platform.LINUX) return null;
+		
 		GpuDeviceBackend deviceBackend = ((IGpuDeviceMixin) RenderSystem.getDevice()).getBackend();
 		if(deviceBackend instanceof IGlDeviceMixin) {
 			return initBackendEGL();
