@@ -19,7 +19,7 @@ Coming soon to a [Modrinth](https://modrinth.com/mod/waylandcraft_plus_plus) nea
 - xkbcommon library 1.11.0 (Linux only)
 - xkbcommon tools (xkbcli) (Linux only)
 - xwayland-satellite (for Xwayland support)
-- For sharing window audio: PipeWire (`pw-record`, `pw-dump`), and `xprop` for X11 apps
+- For sharing window audio on Linux: PipeWire (`pw-record`, `pw-dump`), and `xprop` for X11 apps
 
 Additionally recommended:
 - Prism Launcher
