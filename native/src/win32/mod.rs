@@ -8,6 +8,7 @@ mod apps;
 mod capture;
 mod input;
 mod tracker;
+mod uia;
 
 #[path = "../java_types.rs"]
 mod java_types;

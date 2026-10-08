@@ -16,7 +16,8 @@ use ::windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use ::windows::Win32::UI::WindowsAndMessaging::{
     CWP_SKIPDISABLED, CWP_SKIPINVISIBLE, CWP_SKIPTRANSPARENT,
-    ChildWindowFromPointEx, GUITHREADINFO, GetGUIThreadInfo,
+    ChildWindowFromPointEx, GUITHREADINFO, GetClassNameW, SC_CLOSE, SC_MINIMIZE,
+    SMTO_ABORTIFHUNG, SendMessageTimeoutW, WM_NCHITTEST, WM_SYSCOMMAND, GetGUIThreadInfo,
     GetWindowThreadProcessId, PostMessageW, WA_ACTIVE, WHEEL_DELTA, WM_ACTIVATE, WM_CHAR, WM_KEYDOWN, WM_KEYUP,
     WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL,
     WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN,
@@ -42,11 +43,13 @@ pub struct InputState {
     grab: Option<(HWND, HWND)>,
     /// Last pointer position in the toplevel's client coordinates
     pointer: Option<(HWND, POINT)>,
+    /// A left press that was handled as a title bar button, so its release is dropped
+    caption_click: bool,
 }
 
 impl Default for InputState {
     fn default() -> Self {
-        InputState { keys: [0; 256], buttons: 0, grab: None, pointer: None }
+        InputState { keys: [0; 256], buttons: 0, grab: None, pointer: None, caption_click: false }
     }
 }
 
@@ -116,6 +119,19 @@ impl InputState {
             _ => return,
         };
 
+        // Title bar buttons (which some apps draw inside the client area) don't react
+        // to posted clicks, so they get the command they stand for
+        if button == BTN_LEFT {
+            if !pressed && self.caption_click {
+                self.caption_click = false;
+                return;
+            }
+            if pressed && self.grab.is_none() && caption_command(top, point) {
+                self.caption_click = true;
+                return;
+            }
+        }
+
         if pressed {
             self.buttons |= flag;
         } else {
@@ -139,6 +155,10 @@ impl InputState {
         let msg = if pressed { down } else { up };
         let wparam = (self.buttons as usize) | ((xbutton as usize) << 16);
         post(target, msg, wparam, lparam_point(local));
+
+        if pressed && button == BTN_LEFT && super::uia::is_xaml_host(&class_name(target)) {
+            super::uia::click(top, to_screen(top, point));
+        }
     }
 
     /// Scrolling in wheel notches, positive meaning down/right like on Wayland.
@@ -261,6 +281,52 @@ impl InputState {
         }
         Some(text)
     }
+}
+
+fn to_screen(top: HWND, point: POINT) -> POINT {
+    let mut screen = point;
+    unsafe {
+        let _ = ClientToScreen(top, &mut screen);
+    }
+    screen
+}
+
+fn class_name(hwnd: HWND) -> String {
+    let mut buffer = [0u16; 128];
+    let n = unsafe { GetClassNameW(hwnd, &mut buffer) };
+    String::from_utf16_lossy(&buffer[..n.max(0) as usize])
+}
+
+// Sends the window command for a click on a title bar button, if the point is on one
+fn caption_command(top: HWND, point: POINT) -> bool {
+    const HTMINBUTTON: usize = 8;
+    const HTMAXBUTTON: usize = 9;
+    const HTCLOSE: usize = 20;
+
+    let mut hit = 0usize;
+    let sent = unsafe {
+        SendMessageTimeoutW(
+            top,
+            WM_NCHITTEST,
+            WPARAM(0),
+            lparam_point(to_screen(top, point)),
+            SMTO_ABORTIFHUNG,
+            100,
+            Some(&mut hit),
+        )
+    };
+    if sent.0 == 0 {
+        return false;
+    }
+    let command = match hit {
+        HTCLOSE => SC_CLOSE,
+        HTMINBUTTON => SC_MINIMIZE,
+        // Maximizing would put the window back on the desktop; resize it in-game instead
+        HTMAXBUTTON => return true,
+        _ => return false,
+    };
+    post(top, WM_SYSCOMMAND, command as usize, LPARAM(0));
+    true
 }
 
 fn key_lparam(scancode: u32, pressed: bool) -> LPARAM {
