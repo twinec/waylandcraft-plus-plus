@@ -9,6 +9,7 @@ use ::windows::Win32::Graphics::Gdi::{ClientToScreen, MapWindowPoints};
 use ::windows::Win32::System::SystemServices::{
     MK_LBUTTON, MK_MBUTTON, MK_RBUTTON, MK_XBUTTON1, MK_XBUTTON2,
 };
+use ::windows::core::BOOL;
 use ::windows::Win32::UI::Input::KeyboardAndMouse::{
     GetKeyboardLayout, MAPVK_VSC_TO_VK_EX, MapVirtualKeyExW, ToUnicodeEx,
     VIRTUAL_KEY, VK_CONTROL, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_MENU,
@@ -16,7 +17,8 @@ use ::windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use ::windows::Win32::UI::WindowsAndMessaging::{
     CWP_SKIPDISABLED, CWP_SKIPINVISIBLE, CWP_SKIPTRANSPARENT,
-    ChildWindowFromPointEx, GUITHREADINFO, GetClassNameW, SC_CLOSE, SC_MINIMIZE,
+    ChildWindowFromPointEx, EnumChildWindows, GUITHREADINFO, GetClassNameW, IsWindow,
+    IsWindowVisible, SC_CLOSE, SC_MINIMIZE,
     SMTO_ABORTIFHUNG, SendMessageTimeoutW, WM_NCHITTEST, WM_SYSCOMMAND, GetGUIThreadInfo,
     GetWindowThreadProcessId, PostMessageW, WA_ACTIVE, WHEEL_DELTA, WM_ACTIVATE, WM_CHAR, WM_KEYDOWN, WM_KEYUP,
     WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL,
@@ -45,11 +47,14 @@ pub struct InputState {
     pointer: Option<(HWND, POINT)>,
     /// A left press that was handled as a title bar button, so its release is dropped
     caption_click: bool,
+    /// The last clicked control that isn't XAML, where typing goes when the app's
+    /// focus is in XAML content (Notepad's text area sits in such a window)
+    text_target: Option<(HWND, HWND)>,
 }
 
 impl Default for InputState {
     fn default() -> Self {
-        InputState { keys: [0; 256], buttons: 0, grab: None, pointer: None, caption_click: false }
+        InputState { keys: [0; 256], buttons: 0, grab: None, pointer: None, caption_click: false, text_target: None }
     }
 }
 
@@ -156,8 +161,12 @@ impl InputState {
         let wparam = (self.buttons as usize) | ((xbutton as usize) << 16);
         post(target, msg, wparam, lparam_point(local));
 
-        if pressed && button == BTN_LEFT && super::uia::is_xaml_host(&class_name(target)) {
-            super::uia::click(top, to_screen(top, point));
+        if pressed && button == BTN_LEFT {
+            if super::uia::is_xaml_host(&class_name(target)) {
+                super::uia::click(top, point);
+            } else if target != top {
+                self.text_target = Some((top, target));
+            }
         }
     }
 
@@ -217,7 +226,7 @@ impl InputState {
         }
         self.set_key(vk, pressed);
 
-        let target = focused_control(top);
+        let target = self.key_target(top);
         let alt = self.keys[VK_MENU.0 as usize] & 0x80 != 0;
 
         // Text: translate with the current layout and modifiers, send as characters
@@ -253,6 +262,22 @@ impl InputState {
         post(target, msg, wparam_vk.0 as usize, lparam);
     }
 
+    // Where keys go: the app's focused control, unless that is XAML content, which
+    // ignores posted keys; then the control clicked last, or the app's text box
+    fn key_target(&self, top: HWND) -> HWND {
+        let focus = focused_control(top);
+        if focus != top && !super::uia::is_xaml_host(&class_name(focus)) {
+            return focus;
+        }
+        if let Some((t, child)) = self.text_target
+            && t == top
+            && unsafe { IsWindow(Some(child)) }.as_bool()
+        {
+            return child;
+        }
+        find_text_box(top).unwrap_or(focus)
+    }
+
     fn translate(
         &self, top: HWND, vk: VIRTUAL_KEY, scancode: u32,
     ) -> Option<String> {
@@ -283,7 +308,31 @@ impl InputState {
     }
 }
 
-fn to_screen(top: HWND, point: POINT) -> POINT {
+// The first visible edit control inside a window
+fn find_text_box(top: HWND) -> Option<HWND> {
+    unsafe extern "system" fn callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let found = unsafe { &mut *(lparam.0 as *mut Option<HWND>) };
+        if unsafe { IsWindowVisible(hwnd) }.as_bool()
+            && class_name(hwnd).to_ascii_lowercase().contains("edit")
+        {
+            *found = Some(hwnd);
+            return false.into();
+        }
+        true.into()
+    }
+
+    let mut found: Option<HWND> = None;
+    unsafe {
+        let _ = EnumChildWindows(
+            Some(top),
+            Some(callback),
+            LPARAM(&mut found as *mut Option<HWND> as isize),
+        );
+    }
+    found
+}
+
+pub fn to_screen(top: HWND, point: POINT) -> POINT {
     let mut screen = point;
     unsafe {
         let _ = ClientToScreen(top, &mut screen);

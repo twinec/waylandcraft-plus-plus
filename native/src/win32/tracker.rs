@@ -131,11 +131,12 @@ pub struct Instance {
     own_pid: u32,
     capture_all: bool,
     /// Processes of launched apps and their children
-    tracked_pids: HashSet<u32>,
-    /// Windows adopted after a launch without a known process
-    adopted: HashSet<isize>,
+    /// Processes of launched apps and their children, with the ID of the launched app
+    tracked_pids: HashMap<u32, String>,
+    /// Windows adopted after a launch without a known process, with the app's ID
+    adopted: HashMap<isize, String>,
     /// Windows that existed when an app without a known process was launched
-    pending_launch: Option<(Instant, HashSet<isize>)>,
+    pending_launch: Option<(Instant, HashSet<isize>, String)>,
     last_process_scan: Option<Instant>,
     /// Whether the real windows of launched apps are moved off the desktop
     hide_windows: bool,
@@ -182,8 +183,8 @@ impl Instance {
             windows: vec![],
             own_pid: unsafe { GetCurrentProcessId() },
             capture_all,
-            tracked_pids: HashSet::new(),
-            adopted: HashSet::new(),
+            tracked_pids: HashMap::new(),
+            adopted: HashMap::new(),
             pending_launch: None,
             last_process_scan: None,
             hide_windows,
@@ -208,14 +209,14 @@ impl Instance {
         self.serial
     }
 
-    pub fn track_process(&mut self, pid: u32) {
-        self.tracked_pids.insert(pid);
+    pub fn track_process(&mut self, pid: u32, app_id: &str) {
+        self.tracked_pids.insert(pid, app_id.to_string());
         self.last_process_scan = None;
     }
 
-    pub fn expect_unknown_launch(&mut self) {
+    pub fn expect_unknown_launch(&mut self, app_id: &str) {
         let existing = enum_windows().into_iter().map(|h| h.0 as isize).collect();
-        self.pending_launch = Some((Instant::now(), existing));
+        self.pending_launch = Some((Instant::now(), existing, app_id.to_string()));
     }
 
     pub fn find(&self, handle: i64) -> Option<&TrackedWindow> {
@@ -250,7 +251,7 @@ impl Instance {
             self.last_process_scan = Some(Instant::now());
         }
 
-        if let Some((since, _)) = &self.pending_launch
+        if let Some((since, _, _)) = &self.pending_launch
             && since.elapsed() > LAUNCH_ADOPT_WINDOW
         {
             self.pending_launch = None;
@@ -271,16 +272,16 @@ impl Instance {
 
             let key = hwnd.0 as isize;
             let mut show = self.capture_all
-                || self.tracked_pids.contains(&info.pid)
-                || self.adopted.contains(&key);
+                || self.tracked_pids.contains_key(&info.pid)
+                || self.adopted.contains_key(&key);
 
             if !show
-                && let Some((_, existing)) = &self.pending_launch
+                && let Some((_, existing, _)) = &self.pending_launch
                 && !existing.contains(&key)
                 && !info.title.is_empty()
+                && let Some((_, _, app_id)) = self.pending_launch.take()
             {
-                self.adopted.insert(key);
-                self.pending_launch = None;
+                self.adopted.insert(key, app_id);
                 show = true;
             }
 
@@ -339,6 +340,15 @@ impl Instance {
             if self.windows.iter().any(|w| w.alive && w.hwnd == hwnd && w.kind == kind) {
                 continue;
             }
+            // The launcher's ID for the app, so the game can name the window and show
+            // its icon; other windows get their program's name
+            let app_id = self
+                .adopted
+                .get(&(hwnd.0 as isize))
+                .or_else(|| self.tracked_pids.get(&pid))
+                .cloned()
+                .or_else(|| process_name(pid))
+                .unwrap_or_default();
             let capture = WindowCapture::new(hwnd, self.method, self.d3d.as_ref());
             self.windows.push(Box::new(TrackedWindow {
                 hwnd,
@@ -346,7 +356,7 @@ impl Instance {
                 pid,
                 alive: true,
                 title: String::new(),
-                app_id: process_name(pid).unwrap_or_default(),
+                app_id,
                 capture,
                 frame: None,
                 frame_new: false,
@@ -641,8 +651,8 @@ fn process_name(pid: u32) -> Option<String> {
     }
 }
 
-// Adds every descendant process of the given ones
-fn with_child_processes(roots: &HashSet<u32>) -> HashSet<u32> {
+// Adds every descendant process of the given ones, with the ID of its ancestor
+fn with_child_processes(roots: &HashMap<u32, String>) -> HashMap<u32, String> {
     let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
     unsafe {
         let Ok(snapshot) = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) else {
@@ -667,14 +677,15 @@ fn with_child_processes(roots: &HashSet<u32>) -> HashSet<u32> {
     }
 
     let mut result = roots.clone();
-    let mut queue: Vec<u32> = roots.iter().copied().collect();
+    let mut queue: Vec<u32> = roots.keys().copied().collect();
     while let Some(pid) = queue.pop() {
-        if let Some(kids) = children.get(&pid) {
-            for &kid in kids {
-                // PID 0 parents everything orphaned; never walk into it
-                if kid != 0 && result.insert(kid) {
-                    queue.push(kid);
-                }
+        let Some(kids) = children.get(&pid) else { continue };
+        let app_id = result[&pid].clone();
+        for &kid in kids {
+            // PID 0 parents everything orphaned; never walk into it
+            if kid != 0 && !result.contains_key(&kid) {
+                result.insert(kid, app_id.clone());
+                queue.push(kid);
             }
         }
     }

@@ -28,13 +28,17 @@ pub fn is_xaml_host(class: &str) -> bool {
     XAML_CLASSES.contains(&class)
 }
 
-/// Clicks the control at a screen point of a window, on a thread of its own because
-/// UI Automation calls into the app and can take a while.
-pub fn click(top: HWND, screen: POINT) {
+/// Clicks the control at a point in a window's client area, on a thread of its own
+/// because UI Automation calls into the app and can take a while.
+pub fn click(top: HWND, point: POINT) {
     let top = top.0 as isize;
     std::thread::spawn(move || {
         let _ = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
-        if let Err(e) = click_blocking(HWND(top as *mut _), screen) {
+        // UI Automation reports bounds in physical pixels; compute the point in them too
+        let _ = super::use_physical_pixels();
+        let top = HWND(top as *mut _);
+        let screen = super::input::to_screen(top, point);
+        if let Err(e) = click_blocking(top, screen) {
             eprintln!("[waylandcraft] UI Automation click failed: {e}");
         }
     });
