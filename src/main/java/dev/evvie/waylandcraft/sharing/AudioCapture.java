@@ -52,6 +52,9 @@ public class AudioCapture {
 	private volatile @Nullable WindowsAudioCapture windowsCapture = null;
 	// Set when Windows can't capture this process, so it isn't retried every lookup
 	private boolean windowsFailed = false;
+	// Logged once each, so a lookup that keeps failing doesn't spam the log every 2 s
+	private boolean loggedNoPid = false;
+	private boolean loggedNoStream = false;
 	private volatile boolean stopped = false;
 	private boolean lookupRunning = false;
 	private long lastLookup = 0;
@@ -80,8 +83,20 @@ public class AudioCapture {
 					if(pid > 0) startWindows(pid);
 					return;
 				}
-				String serial = pid > 0 ? findStreamSerial(pid) : null;
-				if(serial != null) start(serial);
+				if(pid <= 0) {
+					if(!loggedNoPid) {
+						WaylandCraftCommon.LOGGER.warn("Could not resolve a pid for window audio sharing (X11 pid lookup failed?)");
+						loggedNoPid = true;
+					}
+					return;
+				}
+				String serial = findStreamSerial(pid);
+				if(serial != null) {
+					start(serial);
+				} else if(!loggedNoStream) {
+					WaylandCraftCommon.LOGGER.warn("No PipeWire playback stream found yet for process " + pid + " (window audio sharing)");
+					loggedNoStream = true;
+				}
 			} finally {
 				synchronized(this) {
 					lookupRunning = false;
@@ -152,6 +167,7 @@ public class AudioCapture {
 			recorder = null;
 			return;
 		}
+		WaylandCraftCommon.LOGGER.info("Started capturing window audio (PipeWire stream " + serial + ")");
 
 		Process process = recorder;
 		Thread reader = new Thread(() -> readLoop(process.getInputStream(), process::destroy), "WaylandCraft audio capture");
