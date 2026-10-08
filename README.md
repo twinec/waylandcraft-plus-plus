@@ -4,7 +4,7 @@ Wayland Compositor in Minecraft
 
 [Demo video](https://youtu.be/cTkEM7b0IQw)
 
-Coming soon to a [Modrinth](https://modrinth.com/mod/waylandcraft_plus_plus) near you!
+Fuck Modrinth's AI policy
 
 > **This branch adds read-only window sharing:** other players can watch and hear a window you share, e.g. to
 > watch YouTube videos together or show a terminal. See [Window sharing](#can-other-players-see-my-windows-window-sharing)
