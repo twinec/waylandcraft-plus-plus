@@ -14,7 +14,7 @@
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
-use ::windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, POINT, RECT};
+use ::windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, POINT, RECT, WPARAM};
 use ::windows::Win32::Graphics::Dwm::{DWMWA_CLOAKED, DwmGetWindowAttribute};
 use ::windows::Win32::Graphics::Gdi::ClientToScreen;
 use ::windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx};
@@ -30,10 +30,10 @@ use ::windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GW_OWNER, GWL_EXSTYLE, GWL_STYLE, GetClassNameW, GetClientRect,
     GetForegroundWindow, GetSystemMetrics, GetWindow, GetWindowLongW, GetWindowRect,
     GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible,
-    IsZoomed, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+    IsZoomed, PostMessageW, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
     SM_YVIRTUALSCREEN, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOMOVE,
     SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SetForegroundWindow, SetWindowPos,
-    ShowWindow, WS_CAPTION, WS_EX_TOOLWINDOW, WS_POPUP,
+    ShowWindow, WM_CLOSE, WS_CAPTION, WS_EX_TOOLWINDOW, WS_POPUP,
 };
 use ::windows::core::{BOOL, PWSTR};
 
@@ -473,6 +473,17 @@ impl Drop for Instance {
                     SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE,
                 )
             };
+        }
+
+        // Like closing a Wayland compositor, quitting the game closes the apps started
+        // in it. They're asked politely, so one with unsaved work can still ask to save.
+        if self.capture_all || std::env::var("WAYLANDCRAFT_KEEP_APPS").as_deref() == Ok("1") {
+            return;
+        }
+        for window in &self.windows {
+            if window.alive && window.kind == Kind::Toplevel {
+                let _ = unsafe { PostMessageW(Some(window.hwnd), WM_CLOSE, WPARAM(0), LPARAM(0)) };
+            }
         }
     }
 }

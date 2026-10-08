@@ -53,6 +53,8 @@ windows and forwards keyboard and mouse input to them, while Minecraft keeps foc
 - Apps open without taking focus from the game, and their real windows are moved just past the edge of your
   desktop, where they keep running. They move back when the game closes. Set `WAYLANDCRAFT_HIDE_WINDOWS=0` to keep
   them on the desktop. Minimized apps keep showing their last frame.
+- Quitting the game closes the apps you started from it (they can still ask to save). Set `WAYLANDCRAFT_KEEP_APPS=1`
+  to keep them open.
 - The app list and icons are cached in `%LOCALAPPDATA%\WaylandCraft`, so the launcher fills instantly after the first
   start. Apps installed since the last start show up the start after.
 - Known limits: keyboard shortcuts that rely on held modifiers (like Ctrl+S) may not reach every app, there is no
