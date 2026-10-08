@@ -13,11 +13,11 @@ Coming soon to a [Modrinth](https://modrinth.com/mod/waylandcraft_plus_plus) nea
 > written with major help from an LLM (Claude Code).
 
 ## System dependencies
-- OS: Linux, or Windows 10 1903+ (experimental, see below)
+- OS: Linux, or Windows 10 1903+ / Windows 11 (x86_64, see below)
 - Minecraft 26.2
 - Fabric mod loader
-- xkbcommon library 1.11.0
-- xkbcommon tools (xkbcli)
+- xkbcommon library 1.11.0 (Linux only)
+- xkbcommon tools (xkbcli) (Linux only)
 - xwayland-satellite (for Xwayland support)
 - For sharing window audio: PipeWire (`pw-record`, `pw-dump`), and `xprop` for X11 apps
 
@@ -41,7 +41,7 @@ the windows, `B` opens the window manager screen.
 Instead of using `G` to capture the keyboard, use `ALT+Q` instead. The only way to turn it off is to press `ALT-Q` again,
 so the `ESC` key is forwarded to the application.
 
-### Does it work on Windows? (experimental)
+### Does it work on Windows?
 Yes, on Windows 10 1903 or newer (x86_64). Instead of running a Wayland compositor, the mod captures real desktop
 windows and forwards keyboard and mouse input to them, while Minecraft keeps focus.
 - The app launcher (`V`) lists the same apps as Start's "All apps", including Store apps. Windows of apps you start
@@ -51,15 +51,19 @@ windows and forwards keyboard and mouse input to them, while Minecraft keeps foc
   can't hide that border, so they use PrintWindow instead, which is slower but borderless.
   `WAYLANDCRAFT_CAPTURE=wgc` or `WAYLANDCRAFT_CAPTURE=printwindow` forces one method.
 - Apps open without taking focus from the game, and their real windows are kept behind the game window, where they
-  keep drawing, and made almost fully transparent (experimental). Minimized apps keep showing their last frame. Set
+  keep drawing, and made almost fully transparent. Minimized apps keep showing their last frame. Set
   `WAYLANDCRAFT_HIDE_WINDOWS=behind` to skip the transparency, `=offscreen` to move them past the edge of the desktop
   instead (some apps, like Notepad, stop drawing there), or `=0` to leave them alone.
 - Quitting the game closes the apps you started from it (they can still ask to save). Set `WAYLANDCRAFT_KEEP_APPS=1`
   to keep them open.
 - The app list and icons are cached in `%LOCALAPPDATA%\WaylandCraft`, so the launcher fills instantly after the first
   start. Apps installed since the last start show up the start after.
-- Known limits: keyboard shortcuts that rely on held modifiers (like Ctrl+S) may not reach every app, there is no
-  relative mouse mode for 3D games yet, and sharing a window's audio is Linux-only for now.
+- Window sharing works like on Linux. Sharing a window's audio needs Windows 10 2004 or newer; it carries everything
+  the app (and its child processes) plays.
+- Windows 11's newer app UI (like Notepad's tabs and menus) ignores the clicks the mod sends, so clicks there press
+  the control under the pointer through UI Automation instead. Dragging doesn't work in those parts.
+- Known limits: keyboard shortcuts that rely on held modifiers (like Ctrl+S) may not reach every app, and there is no
+  relative mouse mode for 3D games yet.
 
 ### How do I run X11 apps?
 Since v2.0.0 waylandcraft has integrated support for [xwayland-satellite](https://github.com/Supreeeme/xwayland-satellite).
