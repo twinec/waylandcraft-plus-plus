@@ -5,6 +5,7 @@
 // Java side treats each captured window as a toplevel with a single surface.
 
 mod apps;
+mod audio;
 mod capture;
 mod input;
 mod tracker;

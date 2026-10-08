@@ -30,6 +30,8 @@ import io.github.jaredmdobson.concentus.OpusException;
  * process (or one of its children) is matched to a PipeWire playback stream with pw-dump,
  * and pw-record captures only that stream. The application keeps playing locally as usual.
  * Audio is encoded to Opus (pure Java, Concentus) so viewers on any platform can decode it.
+ *
+ * On Windows the native library captures the process's audio instead (WindowsAudioCapture).
  */
 public class AudioCapture {
 
@@ -44,7 +46,12 @@ public class AudioCapture {
 	// Receives one Opus packet per 20 ms, with the capture time of its first sample
 	private final ObjLongConsumer<byte[]> sink;
 
+	private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
+
 	private volatile @Nullable Process recorder = null;
+	private volatile @Nullable WindowsAudioCapture windowsCapture = null;
+	// Set when Windows can't capture this process, so it isn't retried every lookup
+	private boolean windowsFailed = false;
 	private volatile boolean stopped = false;
 	private boolean lookupRunning = false;
 	private long lastLookup = 0;
@@ -57,8 +64,9 @@ public class AudioCapture {
 	// Starts capturing once the application has a playback stream. Call periodically;
 	// the lookup (pw-dump, xprop) runs on a background thread.
 	public synchronized void update() {
-		if(stopped || lookupRunning) return;
+		if(stopped || lookupRunning || windowsFailed) return;
 		if(recorder != null && recorder.isAlive()) return;
+		if(windowsCapture != null) return;
 
 		long now = System.currentTimeMillis();
 		if(now - lastLookup < LOOKUP_INTERVAL_MILLIS) return;
@@ -68,6 +76,10 @@ public class AudioCapture {
 		Thread lookup = new Thread(() -> {
 			try {
 				int pid = this.pid.getAsInt();
+				if(WINDOWS) {
+					if(pid > 0) startWindows(pid);
+					return;
+				}
 				String serial = pid > 0 ? findStreamSerial(pid) : null;
 				if(serial != null) start(serial);
 			} finally {
@@ -84,6 +96,38 @@ public class AudioCapture {
 		stopped = true;
 		if(recorder != null) recorder.destroy();
 		recorder = null;
+		if(windowsCapture != null) windowsCapture.stopCapture();
+	}
+
+	private void startWindows(int pid) {
+		WindowsAudioCapture capture;
+		try {
+			capture = new WindowsAudioCapture(pid, SharingNetworking.AUDIO_SAMPLE_RATE, SharingNetworking.AUDIO_CHANNELS);
+		} catch(UnsatisfiedLinkError | RuntimeException e) {
+			WaylandCraftCommon.LOGGER.warn("Could not capture the audio of process " + pid + " for window sharing: " + e);
+			synchronized(this) {
+				windowsFailed = true;
+			}
+			return;
+		}
+
+		synchronized(this) {
+			if(stopped) {
+				capture.close();
+				return;
+			}
+			windowsCapture = capture;
+		}
+
+		Thread reader = new Thread(() -> {
+			try {
+				readLoop(capture, () -> {});
+			} finally {
+				capture.close();
+			}
+		}, "WaylandCraft audio capture");
+		reader.setDaemon(true);
+		reader.start();
 	}
 
 	private synchronized void start(String serial) {
@@ -110,23 +154,23 @@ public class AudioCapture {
 		}
 
 		Process process = recorder;
-		Thread reader = new Thread(() -> readLoop(process), "WaylandCraft audio capture");
+		Thread reader = new Thread(() -> readLoop(process.getInputStream(), process::destroy), "WaylandCraft audio capture");
 		reader.setDaemon(true);
 		reader.start();
 	}
 
-	private void readLoop(Process process) {
+	private void readLoop(InputStream input, Runnable abort) {
 		OpusEncoder encoder;
 		try {
 			encoder = new OpusEncoder(SharingNetworking.AUDIO_SAMPLE_RATE, SharingNetworking.AUDIO_CHANNELS, OpusApplication.OPUS_APPLICATION_AUDIO);
 			encoder.setBitrate(BITRATE);
 		} catch(OpusException e) {
 			WaylandCraftCommon.LOGGER.error("Failed to create Opus encoder for window audio sharing", e);
-			process.destroy();
+			abort.run();
 			return;
 		}
 
-		try(InputStream in = process.getInputStream()) {
+		try(InputStream in = input) {
 			byte[] frame = new byte[FRAME_BYTES];
 			short[] samples = new short[SharingNetworking.AUDIO_FRAME_SAMPLES * SharingNetworking.AUDIO_CHANNELS];
 			byte[] packet = new byte[SharingNetworking.MAX_AUDIO_BYTES];

@@ -1731,6 +1731,7 @@ dependencies = [
  "smithay",
  "thiserror",
  "windows",
+ "windows-core",
  "x264-sys",
  "xkbcommon 0.8.0",
 ]
