@@ -233,6 +233,7 @@ public class SharingOwner {
 		}
 
 		if(window.audio == null) {
+			WaylandCraftCommon.LOGGER.info("Someone wants audio for shared window \"" + window.toplevel.title + "\", looking for its playback stream");
 			long handle = window.toplevel.getHandle();
 			String x11Display = wlc.x11Display;
 			window.audio = new AudioCapture(() -> AudioCapture.resolveX11Pid(window.clientPid, x11Display, window.toplevel.title), (opus, timestamp) ->
