@@ -9,13 +9,15 @@
 // Windows has no way to make an app draw only into the game, so the real windows of
 // launched apps are kept behind the game window, and the game gets the focus back
 // when an app takes it. Apps keep drawing there, unlike off-screen, where some (like
-// Notepad) stop updating. WAYLANDCRAFT_HIDE_WINDOWS=offscreen moves them past the edge
-// of the desktop instead (back when the game exits), and =0 leaves them alone.
+// Notepad) stop updating. They're also made nearly fully transparent, so they stay
+// out of sight even when the game is windowed (experimental; =behind skips that).
+// WAYLANDCRAFT_HIDE_WINDOWS=offscreen moves them past the edge of the desktop instead
+// (back when the game exits), and =0 leaves them alone.
 
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
-use ::windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, POINT, RECT, WPARAM};
+use ::windows::Win32::Foundation::{CloseHandle, COLORREF, HWND, LPARAM, POINT, RECT, WPARAM};
 use ::windows::Win32::Graphics::Dwm::{DWMWA_CLOAKED, DwmGetWindowAttribute};
 use ::windows::Win32::Graphics::Gdi::ClientToScreen;
 use ::windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx};
@@ -34,7 +36,8 @@ use ::windows::Win32::UI::WindowsAndMessaging::{
     IsZoomed, PostMessageW, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
     SM_YVIRTUALSCREEN, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOMOVE,
     SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SetForegroundWindow, SetWindowPos,
-    ShowWindow, WM_CLOSE, WS_CAPTION, WS_EX_TOOLWINDOW, WS_POPUP,
+    SetLayeredWindowAttributes, SetWindowLongW, ShowWindow, LWA_ALPHA, WM_CLOSE,
+    WS_EX_LAYERED, WS_CAPTION, WS_EX_TOOLWINDOW, WS_POPUP,
 };
 use ::windows::core::{BOOL, PWSTR};
 
@@ -142,6 +145,8 @@ pub struct Instance {
     /// Whether the real windows of launched apps are moved off the desktop
     hide_mode: HideMode,
     last_restack: Option<Instant>,
+    /// Windows made transparent, to make opaque again on exit
+    faded: HashSet<isize>,
     /// Where each hidden window was before it was moved, to put it back on exit
     hidden: HashMap<isize, POINT>,
     /// The game's own window, which gets the focus back from launched apps
@@ -180,7 +185,8 @@ impl Instance {
             _ if capture_all => HideMode::Off,
             Ok("0") => HideMode::Off,
             Ok("offscreen") => HideMode::Offscreen,
-            _ => HideMode::Behind,
+            Ok("behind") => HideMode::Behind,
+            _ => HideMode::Transparent,
         };
 
         Instance {
@@ -195,6 +201,7 @@ impl Instance {
             last_process_scan: None,
             hide_mode,
             last_restack: None,
+            faded: HashSet::new(),
             hidden: HashMap::new(),
             game_window: None,
             input: InputState::default(),
@@ -375,7 +382,7 @@ impl Instance {
 
         match self.hide_mode {
             HideMode::Off => {}
-            HideMode::Behind => self.keep_behind_game(),
+            HideMode::Behind | HideMode::Transparent => self.keep_behind_game(),
             HideMode::Offscreen => self.hide_toplevels(),
         }
 
@@ -424,6 +431,12 @@ impl Instance {
             }
             if window.hwnd == foreground {
                 stole_focus = true;
+            }
+            if self.hide_mode == HideMode::Transparent
+                && !self.faded.contains(&(window.hwnd.0 as isize))
+                && fade(window.hwnd)
+            {
+                self.faded.insert(window.hwnd.0 as isize);
             }
             if is_above(window.hwnd, game) {
                 let _ = unsafe {
@@ -515,6 +528,10 @@ impl Instance {
 
 impl Drop for Instance {
     fn drop(&mut self) {
+        for &hwnd in &self.faded {
+            unfade(HWND(hwnd as *mut _));
+        }
+
         for (&hwnd, position) in &self.hidden {
             let hwnd = HWND(hwnd as *mut _);
             if !unsafe { IsWindow(Some(hwnd)) }.as_bool() {
@@ -550,7 +567,36 @@ impl Drop for Instance {
 enum HideMode {
     Off,
     Behind,
+    Transparent,
     Offscreen,
+}
+
+// Lowest opacity that still counts as visible, so the app keeps drawing and its window
+// is still composited (and captured)
+const FADED_ALPHA: u8 = 1;
+
+// Makes a window nearly fully transparent. Windows that are already layered draw their
+// own transparency, which this would break, so they're left alone.
+fn fade(hwnd: HWND) -> bool {
+    let ex_style = unsafe { GetWindowLongW(hwnd, GWL_EXSTYLE) } as u32;
+    if ex_style & WS_EX_LAYERED.0 != 0 {
+        return false;
+    }
+    unsafe {
+        SetWindowLongW(hwnd, GWL_EXSTYLE, (ex_style | WS_EX_LAYERED.0) as i32);
+        SetLayeredWindowAttributes(hwnd, COLORREF(0), FADED_ALPHA, LWA_ALPHA).is_ok()
+    }
+}
+
+fn unfade(hwnd: HWND) {
+    if !unsafe { IsWindow(Some(hwnd)) }.as_bool() {
+        return;
+    }
+    unsafe {
+        let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA);
+        let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+        SetWindowLongW(hwnd, GWL_EXSTYLE, (ex_style & !WS_EX_LAYERED.0) as i32);
+    }
 }
 
 const RESTACK_INTERVAL: Duration = Duration::from_millis(250);
