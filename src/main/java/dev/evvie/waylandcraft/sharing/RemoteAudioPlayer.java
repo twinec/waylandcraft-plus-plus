@@ -10,6 +10,7 @@ import org.lwjgl.system.MemoryUtil;
 
 import io.github.jaredmdobson.concentus.OpusDecoder;
 import io.github.jaredmdobson.concentus.OpusException;
+import dev.evvie.waylandcraft.WaylandCraftCommon;
 import net.minecraft.client.Minecraft;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.phys.Vec3;
@@ -55,11 +56,21 @@ public class RemoteAudioPlayer {
 
 	private static int createSource() {
 		int source = AL10.alGenSources();
+		checkALError("alGenSources");
 		AL10.alSourcef(source, AL10.AL_REFERENCE_DISTANCE, 2.0f);
 		AL10.alSourcef(source, AL10.AL_MAX_DISTANCE, (float) SharingServer.AUDIO_RANGE);
 		AL10.alSourcef(source, AL10.AL_ROLLOFF_FACTOR, 1.0f);
 		AL10.alSourcei(source, AL10.AL_SOURCE_RELATIVE, AL10.AL_FALSE);
 		return source;
+	}
+
+	// AL calls report errors through alGetError() rather than exceptions, so a failure here
+	// (e.g. a bad buffer format, or no context current on this thread) would otherwise be silent
+	private static void checkALError(String what) {
+		int error = AL10.alGetError();
+		if(error != AL10.AL_NO_ERROR) {
+			WaylandCraftCommon.LOGGER.warn("OpenAL error " + error + " for shared window audio during " + what);
+		}
 	}
 
 	public void setPosition(Vec3 leftPos, Vec3 rightPos) {
@@ -79,12 +90,14 @@ public class RemoteAudioPlayer {
 		try {
 			count = decoder.decode(opus, 0, opus.length, samples, 0, SharingNetworking.AUDIO_FRAME_SAMPLES, false);
 		} catch(OpusException e) {
+			WaylandCraftCommon.LOGGER.warn("Failed to decode a shared window's audio packet: " + e);
 			return;
 		}
 		if(count <= 0) return;
 
 		queueChannel(left, count, 0);
 		queueChannel(right, count, 1);
+		checkALError("queueing decoded audio buffers");
 		queuedTimestamps.addLast(timestamp);
 
 		Minecraft minecraft = Minecraft.getInstance();
@@ -97,6 +110,7 @@ public class RemoteAudioPlayer {
 			try(MemoryStack stack = MemoryStack.stackPush()) {
 				AL10.alSourcePlayv(stack.ints(left, right));
 			}
+			checkALError("alSourcePlayv");
 		}
 	}
 

@@ -384,6 +384,7 @@ public class SharingViewer {
 	public void onStreamAudio(StreamAudioPayload payload) {
 		RemoteWindow window = windows.computeIfAbsent(payload.key(), RemoteWindow::new);
 		if(window.audio == null) {
+			WaylandCraftCommon.LOGGER.info("Starting audio playback for shared window " + payload.key());
 			window.audio = new RemoteAudioPlayer();
 			if(window.audioPosition != null) window.audio.setPosition(window.audioPosition.left(), window.audioPosition.right());
 		}
