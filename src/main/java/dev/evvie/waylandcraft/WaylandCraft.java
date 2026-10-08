@@ -157,7 +157,9 @@ public class WaylandCraft implements ClientModInitializer {
 			sharingViewer.renderFloating(ctx.poseStack(), ctx.submitNodeCollector(), ctx.levelState().cameraRenderState.pos);
 		});
 		ClientTickEvents.END_CLIENT_TICK.register((minecraft) -> sharingViewer.tick());
-		ClientPlayConnectionEvents.DISCONNECT.register((listener, minecraft) -> sharingViewer.reset());
+		// Fired straight from the network thread on a server-initiated disconnect, but closing
+		// a shared window's GPU texture is only safe on the render thread
+		ClientPlayConnectionEvents.DISCONNECT.register((listener, minecraft) -> minecraft.execute(sharingViewer::reset));
 		
 		// Linux runs a Wayland compositor, Windows captures desktop windows (native/src/win32)
 		if(Platform.get() != Platform.LINUX && Platform.get() != Platform.WINDOWS) {
