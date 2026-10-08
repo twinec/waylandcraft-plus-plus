@@ -10,6 +10,11 @@ mod input;
 mod tracker;
 mod uia;
 
+use ::windows::Win32::UI::HiDpi::{
+    DPI_AWARENESS_CONTEXT, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+    SetThreadDpiAwarenessContext,
+};
+
 #[path = "../java_types.rs"]
 mod java_types;
 
@@ -380,6 +385,29 @@ enum BridgeError {
 
 type R<T> = Result<T, BridgeError>;
 
+/// Makes window coordinates on this thread physical pixels, matching what's captured,
+/// even if the game isn't DPI aware. Returns the previous setting.
+fn use_physical_pixels() -> DPI_AWARENESS_CONTEXT {
+    unsafe { SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) }
+}
+
+/// Physical pixel coordinates until dropped, leaving the game's own setting alone
+struct PhysicalPixels(DPI_AWARENESS_CONTEXT);
+
+impl PhysicalPixels {
+    fn new() -> PhysicalPixels {
+        PhysicalPixels(use_physical_pixels())
+    }
+}
+
+impl Drop for PhysicalPixels {
+    fn drop(&mut self) {
+        if !self.0.is_invalid() {
+            unsafe { SetThreadDpiAwarenessContext(self.0) };
+        }
+    }
+}
+
 fn instance<'a>(ptr: jlong, location: &'static str) -> R<&'a mut Instance> {
     let ptr = ptr as usize as *mut Instance;
     if ptr.is_null() {
@@ -425,11 +453,13 @@ fn init<'local>(
     _class: JClass<'local>,
     _dmabuf_feedback: JDmabufFeedbackData<'local>,
 ) -> R<jlong> {
+    let _pixels = PhysicalPixels::new();
     let instance = Box::new(Instance::new());
     Ok(Box::into_raw(instance) as usize as jlong)
 }
 
 fn shutdown<'local>(_env: &mut Env<'local>, _class: JClass<'local>, instance: jlong) -> R<()> {
+    let _pixels = PhysicalPixels::new();
     let ptr = instance as usize as *mut Instance;
     if !ptr.is_null() {
         let _ = unsafe { Box::from_raw(ptr) };
@@ -438,6 +468,7 @@ fn shutdown<'local>(_env: &mut Env<'local>, _class: JClass<'local>, instance: jl
 }
 
 fn dispatch_clients<'local>(_env: &mut Env<'local>, _class: JClass<'local>, instance: jlong) -> R<()> {
+    let _pixels = PhysicalPixels::new();
     self::instance(instance, "dispatchClients")?.update();
     Ok(())
 }
@@ -539,6 +570,7 @@ fn toplevel_resize<'local>(
     height: jint,
     _interactive: jboolean,
 ) -> R<()> {
+    let _pixels = PhysicalPixels::new();
     if width > 0 && height > 0 && let Some(w) = window_ref(handle) {
         w.resize(width, height);
     }
@@ -640,6 +672,7 @@ fn check_input_region<'local>(_env: &mut Env<'local>, _class: JClass<'local>, _s
 }
 
 fn pointer_motion<'local>(_env: &mut Env<'local>, _class: JClass<'local>, instance: jlong, x: jdouble, y: jdouble) -> R<()> {
+    let _pixels = PhysicalPixels::new();
     let instance = self::instance(instance, "pointerMotion")?;
     let Some(hwnd) = instance.pointer_focus else { return Ok(()) };
     let Some(window) = instance.find_hwnd(hwnd) else { return Ok(()) };
@@ -683,12 +716,14 @@ fn pointer_leave<'local>(_env: &mut Env<'local>, _class: JClass<'local>, instanc
 }
 
 fn pointer_button<'local>(_env: &mut Env<'local>, _class: JClass<'local>, instance: jlong, button: jint, state: jint) -> R<jint> {
+    let _pixels = PhysicalPixels::new();
     let instance = self::instance(instance, "pointerButton")?;
     instance.input.button(button, state != 0);
     Ok(instance.next_serial())
 }
 
 fn pointer_axis<'local>(_env: &mut Env<'local>, _class: JClass<'local>, instance: jlong, axis: jint, value: jdouble) -> R<()> {
+    let _pixels = PhysicalPixels::new();
     let instance = self::instance(instance, "pointerAxis")?;
     instance.input.scroll(axis == 1, value);
     Ok(())
@@ -700,6 +735,7 @@ fn cursor_shape<'local>(_env: &mut Env<'local>, _class: JClass<'local>, _instanc
 }
 
 fn keyboard_focus<'local>(_env: &mut Env<'local>, _class: JClass<'local>, instance: jlong, handle: jlong) -> R<()> {
+    let _pixels = PhysicalPixels::new();
     let instance = self::instance(instance, "keyboardFocus")?;
     let focus = instance.find(handle).filter(|w| w.alive).map(|w| w.hwnd);
     if focus != instance.keyboard_focus {
@@ -724,6 +760,7 @@ fn keyboard_deactivate<'local>(_env: &mut Env<'local>, _class: JClass<'local>, i
 }
 
 fn keyboard_input<'local>(_env: &mut Env<'local>, _class: JClass<'local>, instance: jlong, scancode: jint, action: jint) -> R<()> {
+    let _pixels = PhysicalPixels::new();
     let instance = self::instance(instance, "keyboardInput")?;
     let Some(hwnd) = instance.keyboard_focus else { return Ok(()) };
     instance.input.key(hwnd, input::xkb_keycode_to_scancode(scancode as u32), action != 0);
@@ -812,11 +849,11 @@ fn exec_app<'local>(env: &mut Env<'local>, _class: JClass<'local>, instance: jlo
     let app_id = app_id.try_to_string(env)?;
     match apps::launch(&app_id) {
         Some(apps::Launched::Process(pid)) => {
-            instance.track_process(pid);
+            instance.track_process(pid, &app_id);
             Ok(true)
         }
         Some(apps::Launched::Unknown) => {
-            instance.expect_unknown_launch();
+            instance.expect_unknown_launch(&app_id);
             Ok(true)
         }
         None => Ok(false),
