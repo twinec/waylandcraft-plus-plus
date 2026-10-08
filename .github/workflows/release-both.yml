@@ -265,6 +265,13 @@ jobs:
         MODRINTH_PROJECT_ID: ${{ vars.MODRINTH_PROJECT_ID }}
         MODRINTH_CHANGELOG: ${{ inputs.changelog }}
       run: ./gradlew modrinth
+    # No-op until CURSEFORGE_TOKEN/CURSEFORGE_PROJECT_ID are set (see build.gradle).
+    - name: Publish to CurseForge
+      env:
+        CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+        CURSEFORGE_CHANGELOG: ${{ inputs.changelog }}
+      run: ./gradlew publishCurseForge
     - name: Upload jar for combined release
       uses: actions/upload-artifact@v7
       with:
@@ -303,6 +310,13 @@ jobs:
         MODRINTH_PROJECT_ID: ${{ vars.MODRINTH_PROJECT_ID }}
         MODRINTH_CHANGELOG: ${{ inputs.changelog }}
       run: ./gradlew modrinth
+    # No-op until CURSEFORGE_TOKEN/CURSEFORGE_PROJECT_ID are set (see build.gradle).
+    - name: Publish to CurseForge
+      env:
+        CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+        CURSEFORGE_CHANGELOG: ${{ inputs.changelog }}
+      run: ./gradlew publishCurseForge
     - name: Upload jar for combined release
       uses: actions/upload-artifact@v7
       with:

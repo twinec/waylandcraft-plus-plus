@@ -2,7 +2,10 @@ plugins {
 	id 'net.fabricmc.fabric-loom' version "${loom_version}"
 	id 'maven-publish'
 	id 'com.modrinth.minotaur' version '2.+'
+	id 'net.darkhax.curseforgegradle' version '1.1.28'
 }
+
+import net.darkhax.curseforgegradle.TaskPublishCurseForge
 
 version = project.mod_version
 group = project.maven_group
@@ -203,6 +206,38 @@ tasks.modrinth.onlyIf {
 }
 
 tasks.modrinth.dependsOn tasks.build
+
+// Publishing to CurseForge, mirroring the Modrinth setup above: driven only
+// from CI, uploading the exact jar 'build' just produced. CURSEFORGE_TOKEN
+// and CURSEFORGE_PROJECT_ID come from the environment (a repo secret and a
+// repo variable); until Artemis creates the CurseForge project and sets
+// both, this task stays a deliberate no-op rather than failing the build.
+tasks.register('publishCurseForge', TaskPublishCurseForge) {
+	apiToken = System.getenv("CURSEFORGE_TOKEN") ?: "CURSEFORGE_TOKEN_MISSING"
+	disableVersionDetection()
+
+	def projectId = System.getenv("CURSEFORGE_PROJECT_ID") ?: "CURSEFORGE_PROJECT_ID_MISSING"
+	def mainFile = upload(projectId, file("build/libs/${project.archives_base_name}.jar"))
+	mainFile.changelog = System.getenv("CURSEFORGE_CHANGELOG") ?: "See the GitHub release for details."
+	mainFile.changelogType = "markdown"
+	mainFile.releaseType = System.getenv("CURSEFORGE_VERSION_TYPE") ?: "release"
+	mainFile.displayName = "WaylandCraft++ ${project.version}"
+	// CurseForge's game-version strings must match its own catalog exactly;
+	// keeping this in step with project.minecraft_version (as Modrinth's
+	// gameVersions does) means a bump to gradle.properties covers both.
+	mainFile.addGameVersion(project.minecraft_version)
+	mainFile.addModLoader("Fabric")
+
+	dependsOn tasks.build
+
+	onlyIf {
+		def ready = System.getenv("CURSEFORGE_TOKEN") != null && System.getenv("CURSEFORGE_PROJECT_ID") != null
+		if (!ready) {
+			logger.lifecycle("Skipping CurseForge publish: CURSEFORGE_TOKEN/CURSEFORGE_PROJECT_ID not set in the environment.")
+		}
+		ready
+	}
+}
 
 // configure the maven publication
 publishing {
