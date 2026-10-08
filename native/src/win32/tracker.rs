@@ -7,9 +7,10 @@
 // their owner, the rest become toplevels.
 //
 // Windows has no way to make an app draw only into the game, so the real windows of
-// launched apps are moved past the edge of the desktop, where they keep rendering and
-// being captured, and the game window gets the focus back. They return to where they
-// were when the game exits. WAYLANDCRAFT_HIDE_WINDOWS=0 leaves them on the desktop.
+// launched apps are kept behind the game window, and the game gets the focus back
+// when an app takes it. Apps keep drawing there, unlike off-screen, where some (like
+// Notepad) stop updating. WAYLANDCRAFT_HIDE_WINDOWS=offscreen moves them past the edge
+// of the desktop instead (back when the game exits), and =0 leaves them alone.
 
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
@@ -27,7 +28,7 @@ use ::windows::Win32::System::Threading::{
     PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
 use ::windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GW_OWNER, GWL_EXSTYLE, GWL_STYLE, GetClassNameW, GetClientRect,
+    EnumWindows, GW_HWNDPREV, GW_OWNER, HWND_BOTTOM, GWL_EXSTYLE, GWL_STYLE, GetClassNameW, GetClientRect,
     GetForegroundWindow, GetSystemMetrics, GetWindow, GetWindowLongW, GetWindowRect,
     GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible,
     IsZoomed, PostMessageW, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
@@ -139,7 +140,8 @@ pub struct Instance {
     pending_launch: Option<(Instant, HashSet<isize>, String)>,
     last_process_scan: Option<Instant>,
     /// Whether the real windows of launched apps are moved off the desktop
-    hide_windows: bool,
+    hide_mode: HideMode,
+    last_restack: Option<Instant>,
     /// Where each hidden window was before it was moved, to put it back on exit
     hidden: HashMap<isize, POINT>,
     /// The game's own window, which gets the focus back from launched apps
@@ -174,8 +176,12 @@ impl Instance {
         eprintln!("[waylandcraft] Capturing windows with {method:?}");
 
         let capture_all = std::env::var("WAYLANDCRAFT_WINDOWS").as_deref() == Ok("all");
-        let hide_windows =
-            !capture_all && std::env::var("WAYLANDCRAFT_HIDE_WINDOWS").as_deref() != Ok("0");
+        let hide_mode = match std::env::var("WAYLANDCRAFT_HIDE_WINDOWS").as_deref() {
+            _ if capture_all => HideMode::Off,
+            Ok("0") => HideMode::Off,
+            Ok("offscreen") => HideMode::Offscreen,
+            _ => HideMode::Behind,
+        };
 
         Instance {
             method,
@@ -187,7 +193,8 @@ impl Instance {
             adopted: HashMap::new(),
             pending_launch: None,
             last_process_scan: None,
-            hide_windows,
+            hide_mode,
+            last_restack: None,
             hidden: HashMap::new(),
             game_window: None,
             input: InputState::default(),
@@ -366,8 +373,10 @@ impl Instance {
             }));
         }
 
-        if self.hide_windows {
-            self.hide_toplevels();
+        match self.hide_mode {
+            HideMode::Off => {}
+            HideMode::Behind => self.keep_behind_game(),
+            HideMode::Offscreen => self.hide_toplevels(),
         }
 
         for window in &mut self.windows {
@@ -396,6 +405,45 @@ impl Instance {
         }
 
         self.update_popup_offsets();
+    }
+
+    // Keeps launched apps' windows below the game window, and takes the focus back
+    // from them
+    fn keep_behind_game(&mut self) {
+        if self.last_restack.is_some_and(|t| t.elapsed() < RESTACK_INTERVAL) {
+            return;
+        }
+        self.last_restack = Some(Instant::now());
+        let Some(game) = self.game_window else { return };
+
+        let foreground = unsafe { GetForegroundWindow() };
+        let mut stole_focus = false;
+        for window in &self.windows {
+            if !window.alive || window.kind != Kind::Toplevel {
+                continue;
+            }
+            if window.hwnd == foreground {
+                stole_focus = true;
+            }
+            if is_above(window.hwnd, game) {
+                let _ = unsafe {
+                    SetWindowPos(
+                        window.hwnd,
+                        Some(HWND_BOTTOM),
+                        0,
+                        0,
+                        0,
+                        0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER,
+                    )
+                };
+            }
+        }
+
+        // The game process had the last input, so Windows lets it take the focus back
+        if stole_focus {
+            let _ = unsafe { SetForegroundWindow(game) };
+        }
     }
 
     // Moves launched apps' windows past the edge of the desktop. Apps that move their
@@ -496,6 +544,33 @@ impl Drop for Instance {
             }
         }
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum HideMode {
+    Off,
+    Behind,
+    Offscreen,
+}
+
+const RESTACK_INTERVAL: Duration = Duration::from_millis(250);
+
+// Whether a window is above another in the z-order
+fn is_above(hwnd: HWND, other: HWND) -> bool {
+    let mut current = other;
+    // Bounded, in case windows are restacked while walking
+    for _ in 0..4096 {
+        match unsafe { GetWindow(current, GW_HWNDPREV) } {
+            Ok(prev) if !prev.is_invalid() => {
+                if prev == hwnd {
+                    return true;
+                }
+                current = prev;
+            }
+            _ => return false,
+        }
+    }
+    false
 }
 
 fn virtual_screen() -> RECT {

@@ -50,9 +50,9 @@ windows and forwards keyboard and mouse input to them, while Minecraft keeps foc
 - Windows 11 captures with Windows.Graphics.Capture without the yellow capture border. Older Windows 10 versions
   can't hide that border, so they use PrintWindow instead, which is slower but borderless.
   `WAYLANDCRAFT_CAPTURE=wgc` or `WAYLANDCRAFT_CAPTURE=printwindow` forces one method.
-- Apps open without taking focus from the game, and their real windows are moved just past the edge of your
-  desktop, where they keep running. They move back when the game closes. Set `WAYLANDCRAFT_HIDE_WINDOWS=0` to keep
-  them on the desktop. Minimized apps keep showing their last frame.
+- Apps open without taking focus from the game, and their real windows are kept behind the game window, where they
+  keep drawing. Minimized apps keep showing their last frame. Set `WAYLANDCRAFT_HIDE_WINDOWS=offscreen` to move them
+  past the edge of the desktop instead (some apps, like Notepad, stop drawing there), or `=0` to leave them alone.
 - Quitting the game closes the apps you started from it (they can still ask to save). Set `WAYLANDCRAFT_KEEP_APPS=1`
   to keep them open.
 - The app list and icons are cached in `%LOCALAPPDATA%\WaylandCraft`, so the launcher fills instantly after the first
