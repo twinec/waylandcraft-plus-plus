@@ -17,7 +17,7 @@ use ::windows::Win32::UI::Input::KeyboardAndMouse::{
 use ::windows::Win32::UI::WindowsAndMessaging::{
     CWP_SKIPDISABLED, CWP_SKIPINVISIBLE, CWP_SKIPTRANSPARENT,
     ChildWindowFromPointEx, GUITHREADINFO, GetGUIThreadInfo,
-    GetWindowThreadProcessId, PostMessageW, WHEEL_DELTA, WM_CHAR, WM_KEYDOWN, WM_KEYUP,
+    GetWindowThreadProcessId, PostMessageW, WA_ACTIVE, WHEEL_DELTA, WM_ACTIVATE, WM_CHAR, WM_KEYDOWN, WM_KEYUP,
     WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL,
     WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN,
     WM_SYSKEYUP, WM_XBUTTONDOWN, WM_XBUTTONUP,
@@ -282,6 +282,13 @@ fn scancode_to_vk(scancode: u32) -> VIRTUAL_KEY {
     };
     let vk = unsafe { MapVirtualKeyExW(code, MAPVK_VSC_TO_VK_EX, None) };
     VIRTUAL_KEY(vk as u16)
+}
+
+/// Tells a window it was activated, without making it the foreground window. Apps
+/// started in the background never got activated, so they have no focused control
+/// for keys to go to; activating makes them focus one (their text box, say).
+pub fn activate(top: HWND) {
+    post(top, WM_ACTIVATE, WA_ACTIVE as usize, LPARAM(0));
 }
 
 // The control with keyboard focus inside the window's thread, e.g. a text box
