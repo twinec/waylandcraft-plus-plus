@@ -183,6 +183,14 @@ jobs:
         MODRINTH_CHANGELOG: ${{ needs.prepare.outputs.changelog }}
       run: ./gradlew modrinth
 
+    # No-op until CURSEFORGE_TOKEN/CURSEFORGE_PROJECT_ID are set (see build.gradle).
+    - name: Publish to CurseForge
+      env:
+        CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+        CURSEFORGE_CHANGELOG: ${{ needs.prepare.outputs.changelog }}
+      run: ./gradlew publishCurseForge
+
     - name: Create GitHub release
       uses: softprops/action-gh-release@v2
       with:
