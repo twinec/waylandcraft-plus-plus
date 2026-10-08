@@ -127,6 +127,35 @@ jobs:
         name: native-libs-26-2-${{ matrix.platform.name }}
         path: native-libs/libwaylandcraft-${{ matrix.platform.name }}.so
 
+  # The Windows backend (native/src/win32) is cross-compiled with mingw; it needs
+  # neither xkbcommon nor x264
+  compile-native-windows-26-2:
+    needs: prepare-26-2
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        ref: ${{ needs.prepare-26-2.outputs.ref }}
+    - name: Install dependencies
+      run: sudo apt install -y gcc-mingw-w64-x86-64
+    - name: Setup rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-pc-windows-gnu
+    - name: Compile native library
+      working-directory: native/
+      run: cargo build --release --target=x86_64-pc-windows-gnu
+    - name: Move native library
+      run: |
+        mkdir native-libs
+        mv native/target/x86_64-pc-windows-gnu/release/waylandcraft.dll \
+          native-libs/waylandcraft-windows-x86_64.dll
+    - name: Upload artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: native-libs-26-2-windows-x86_64
+        path: native-libs/waylandcraft-windows-x86_64.dll
+
   compile-native-libs-26-3:
     needs: prepare-26-3
     strategy:
@@ -171,13 +200,42 @@ jobs:
         name: native-libs-26-3-${{ matrix.platform.name }}
         path: native-libs/libwaylandcraft-${{ matrix.platform.name }}.so
 
+  # The Windows backend (native/src/win32) is cross-compiled with mingw; it needs
+  # neither xkbcommon nor x264
+  compile-native-windows-26-3:
+    needs: prepare-26-3
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        ref: ${{ needs.prepare-26-3.outputs.ref }}
+    - name: Install dependencies
+      run: sudo apt install -y gcc-mingw-w64-x86-64
+    - name: Setup rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-pc-windows-gnu
+    - name: Compile native library
+      working-directory: native/
+      run: cargo build --release --target=x86_64-pc-windows-gnu
+    - name: Move native library
+      run: |
+        mkdir native-libs
+        mv native/target/x86_64-pc-windows-gnu/release/waylandcraft.dll \
+          native-libs/waylandcraft-windows-x86_64.dll
+    - name: Upload artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: native-libs-26-3-windows-x86_64
+        path: native-libs/waylandcraft-windows-x86_64.dll
+
   # Builds and publishes to Modrinth per-line (each line's gradle.properties
   # carries its own minecraft_version, so Minotaur tags the upload with the
   # right game version automatically). The jar is also kept as a build
   # artifact so the release job below can attach both jars to one page.
   build-26-2:
     runs-on: ubuntu-22.04
-    needs: [prepare-26-2, compile-native-libs-26-2]
+    needs: [prepare-26-2, compile-native-libs-26-2, compile-native-windows-26-2]
     steps:
     - uses: actions/checkout@v6
       with:
@@ -215,7 +273,7 @@ jobs:
 
   build-26-3:
     runs-on: ubuntu-22.04
-    needs: [prepare-26-3, compile-native-libs-26-3]
+    needs: [prepare-26-3, compile-native-libs-26-3, compile-native-windows-26-3]
     steps:
     - uses: actions/checkout@v6
       with:

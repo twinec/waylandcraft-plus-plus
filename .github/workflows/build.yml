@@ -43,9 +43,34 @@ jobs:
       with:
         path: native-libs/libwaylandcraft-${{ matrix.platform.name }}.so
         archive: false
+  # The Windows backend (native/src/win32) is cross-compiled with mingw; it needs
+  # neither xkbcommon nor x264
+  compile-native-windows:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install dependencies
+      run: sudo apt install -y gcc-mingw-w64-x86-64
+    - name: Setup rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-pc-windows-gnu
+    - name: Compile native library
+      working-directory: native/
+      run: cargo build --target=x86_64-pc-windows-gnu
+    - name: Move native library
+      run: |
+        mkdir native-libs
+        mv native/target/x86_64-pc-windows-gnu/debug/waylandcraft.dll \
+          native-libs/waylandcraft-windows-x86_64.dll
+    - name: Upload artifact
+      uses: actions/upload-artifact@v7
+      with:
+        path: native-libs/waylandcraft-windows-x86_64.dll
+        archive: false
   build-java:
     runs-on: ubuntu-22.04
-    needs: compile-native-libs
+    needs: [compile-native-libs, compile-native-windows]
     steps:
     - uses: actions/checkout@v6
     - name: Download native libs
@@ -53,6 +78,12 @@ jobs:
       with:
         path: native-libs
         pattern: libwaylandcraft-*.so
+        merge-multiple: true
+    - name: Download Windows native lib
+      uses: actions/download-artifact@v8
+      with:
+        path: native-libs
+        pattern: waylandcraft-windows-*.dll
         merge-multiple: true
     - name: Set up JDK 25
       uses: actions/setup-java@v5

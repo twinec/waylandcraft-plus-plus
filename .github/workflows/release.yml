@@ -118,9 +118,37 @@ jobs:
         name: native-libs-${{ matrix.platform.name }}
         path: native-libs/libwaylandcraft-${{ matrix.platform.name }}.so
 
+  # The Windows backend (native/src/win32) is cross-compiled with mingw; it needs
+  # neither xkbcommon nor x264
+  compile-native-windows:
+    needs: prepare
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        ref: ${{ needs.prepare.outputs.ref }}
+    - name: Install dependencies
+      run: sudo apt install -y gcc-mingw-w64-x86-64
+    - name: Setup rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-pc-windows-gnu
+    - name: Compile native library
+      working-directory: native/
+      run: cargo build --release --target=x86_64-pc-windows-gnu
+    - name: Move native library
+      run: |
+        mkdir native-libs
+        mv native/target/x86_64-pc-windows-gnu/release/waylandcraft.dll \
+          native-libs/waylandcraft-windows-x86_64.dll
+    - name: Upload artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: native-libs-windows-x86_64
+        path: native-libs/waylandcraft-windows-x86_64.dll
   build-and-release:
     runs-on: ubuntu-22.04
-    needs: [prepare, compile-native-libs]
+    needs: [prepare, compile-native-libs, compile-native-windows]
     steps:
     - uses: actions/checkout@v6
       with:

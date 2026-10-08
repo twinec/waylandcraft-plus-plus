@@ -68,7 +68,6 @@ public class WindowFramebuffer implements FramebufferRenderable {
 		.withFragmentShader(Identifier.fromNamespaceAndPath(WaylandCraftCommon.MOD_ID, "unpremultiply"))
 		.withBindGroupLayout(BindGroupLayouts.SAMPLER0)
 		.withColorTargetState(ColorTargetState.DEFAULT)
-		.withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
 		.withPrimitiveTopology(PrimitiveTopology.TRIANGLES)
 		.build()
 	);
